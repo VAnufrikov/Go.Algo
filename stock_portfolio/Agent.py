@@ -1,6 +1,5 @@
-from stock_portfolio.portfolio import portfolio
 from settings import LIMIT
-from stock_portfolio.portfolio import portfolio
+from stock_portfolio.portfolio import Stocks
 
 
 class Agent:
@@ -9,12 +8,12 @@ class Agent:
     def __int__(self, limit=0):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
-        self.portfel = portfolio()
+        self.portfel = Stocks()
 
     def by(self):
         """Реализация выставление тикета в стакан на покупку"""
-        # self.get_time_baket(tiket)
         pass
+
     def sell(self):
         """Реализация выставление тикета в стакан на продажу"""
         pass
@@ -28,8 +27,7 @@ class Agent:
                 выход решение о покупке или продаже """
         tiket = self.portfel.get_tiket()
 
-        data_between_dates = self.portfel.get_time_baket(tiket)
-
+        df_between_dates = self.portfel.get_time_baket(tiket)
 
         self.sell()
 
