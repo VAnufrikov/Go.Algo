@@ -1,16 +1,24 @@
-# This is a sample Python script.
+import pandas as pd
+from moexalgo import Market, Ticker
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+LIMIT = 10000
+DATE_START = '2021-01-01'
+DATE_END = '2021-01-02'
 
 
-# Press the green button in the gutter to run the script.
+def read_data_stock(srch):
+    """Подготавливаем датасет со всеми компаниями ан московской бирже"""
+    df = pd.read_csv('data/ListingSecurityList.csv', engine='python', encoding='cp1251', sep=';')
+
+    df = df[['TRADE_CODE', 'EMITENT_FULL_NAME', 'INSTRUMENT_TYPE', 'LIST_SECTION', 'INSTRUMENT_CATEGORY', 'CURRENCY']]
+
+    # Берем только акции#
+    df = df[(df['INSTRUMENT_TYPE'] == 'Акция обыкновенная') | (df['INSTRUMENT_TYPE'] == 'Акции иностранного эмитента')]
+
+    return df
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
+    listing = read_data_stock('data/ListingSecurityList.csv')
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    print(listing.head())
