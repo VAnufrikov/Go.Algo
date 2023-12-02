@@ -1,6 +1,6 @@
 from random import choice
 
-from settings import SRCH_MOEX, DATE_START, DATE_END
+from settings import SRCH_MOEX
 from upload_data.Ranking import ranking
 from upload_data.upload import read_data_stock, upload_data_from_moexalgo
 
@@ -21,10 +21,10 @@ class Stocks:
         """Получаем рандомный тикет для фокусирования бота"""
         return choice(self.ranking_listing)
 
-    def get_time_baket(self, tiket):
+    def get_time_baket(self, tiket, start, end):
         """Получаем бакет по которому будем получать информацию о тикете"""
 
-        data = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
+        data = upload_data_from_moexalgo(tiket, start, end)
 
         data_tiket = data[data['secid'] == tiket].sort_values(by='tradedate', ascending=True)
 

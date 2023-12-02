@@ -1,14 +1,17 @@
-from settings import LIMIT
 from stock_portfolio.portfolio import Stocks
+from settings import DATE_START, DATE_END, LIMIT
 
+import etna
 
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
-    def __int__(self, limit=0):
+    def __int__(self):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
-        self.portfel = Stocks()
+
+    def predict(self):
+        pass
 
     def by(self):
         """Реализация выставление тикета в стакан на покупку"""
@@ -22,15 +25,19 @@ class Agent:
         """Не выставляем тикет и просто ждем, возвращаем действие ничего не делаем"""
         pass
 
-    def think(self):
-        """Входом будет получение датасета за прошлые даты,
+def run_agent():
+    """Входом будет получение датасета за прошлые даты,
                 выход решение о покупке или продаже """
-        tiket = self.portfel.get_tiket()
+    portfel = Stocks()
+    agent = Agent()
 
-        df_between_dates = self.portfel.get_time_baket(tiket)
+    tiket = portfel.get_tiket()
 
-        self.sell()
+    df_between_dates = portfel.get_time_baket(tiket, DATE_START, DATE_END)
 
-        self.by()
+    agent.sell()
 
-        self.do_nofing()
+    agent.by()
+
+    agent.do_nofing()
+
