@@ -5,6 +5,7 @@ from settings import DATE_START, DATE_END, LIMIT
 
 import etna
 
+
 def run_agent():
     """Входом будет получение датасета за прошлые даты,
                 выход решение о покупке или продаже """
@@ -32,6 +33,18 @@ def etna_predict(param):
     return 0
 
 
+def clean_df_for_etna(df):
+
+    df = df[
+        ['secid', 'trade_datetime', 'pr_open', 'pr_high', 'pr_low', 'vol', 'val', 'trades', 'trades_b', 'trades_s',
+         'val_b',
+         'val_s', 'vol_b', 'vol_s', 'pr_close']]
+
+    df.columns = ['segment', 'timestamp', 'pr_open', 'pr_high', 'pr_low', 'vol', 'val', 'trades', 'trades_b',
+                  'trades_s',
+                  'val_b', 'val_s', 'vol_b', 'vol_s', 'target']
+
+
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
@@ -42,14 +55,10 @@ class Agent:
     def predict(self, df):
         df.loc[:, 'trade_datetime'] = pd.to_datetime(df.tradedate.astype(str) + ' ' + df.tradetime.astype(str))
 
-        df = df[
-            ['trade_datetime', 'pr_open', 'pr_high', 'pr_low', 'vol', 'val', 'trades', 'trades_b', 'trades_s', 'val_b',
-             'val_s', 'vol_b', 'vol_s', 'pr_close']]
+        # Сохраняем исходные trade_datetime для визуализации#
+        list_trade_datetime = df['trade_datetime'].to_list()
 
-        df.columns = ['trade_datetime', 'pr_open', 'pr_high', 'pr_low', 'vol', 'val', 'trades', 'trades_b', 'trades_s',
-                      'val_b', 'val_s', 'vol_b', 'vol_s', 'target']
-
-        df["segment"] = "main"
+        clean_data_orderstats = clean_df_for_etna(df)
 
         predict = etna_predict(TSDataset.to_dataset(df))
 
@@ -60,7 +69,6 @@ class Agent:
         если так же то ничего не делаем 
          """
         return 0
-
 
     def by(self):
         """Реализация выставление тикета в стакан на покупку"""
@@ -73,4 +81,3 @@ class Agent:
     def do_nofing(self):
         """Не выставляем тикет и просто ждем, возвращаем действие ничего не делаем"""
         pass
-
