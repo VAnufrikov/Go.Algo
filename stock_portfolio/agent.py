@@ -2,7 +2,6 @@ import pandas as pd
 from etna.datasets.tsdataset import TSDataset
 from stock_portfolio.portfolio import Stocks
 from settings import DATE_START, DATE_END, LIMIT
-
 import etna
 
 
