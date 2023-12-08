@@ -1,9 +1,11 @@
-import pandas as pd
+import etna
 import random
+import pandas as pd
+
+from settings import Config, LIMIT
+from datetime import datetime as dt
 from etna.datasets.tsdataset import TSDataset
 from stock_portfolio.portfolio import Stocks
-from settings import Config
-import etna
 
 
 def run_agent():
@@ -50,7 +52,7 @@ class Agent:
 
     def __int__(self):
         """Инициализация агента и его портфеля"""
-        self.limit = Config.LIMIT
+        self.limit = LIMIT
 
     def predict(self, df):
         df.loc[:, 'trade_datetime'] = pd.to_datetime(df.tradedate.astype(str) + ' ' + df.tradetime.astype(str))
@@ -72,7 +74,9 @@ class Agent:
 
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
-        str_line = f"{ticket}|{price}|{count}\n"
+        take_profit, stop_loss = self.get_TP_SL(ticket)
+        datetime = str(dt.now())
+        str_line = f"{datetime}|{ticket}|{price}|{count}|{take_profit}|{stop_loss}\n"
         with open(Config.STOCKS_PATH, 'a') as fout:
             fout.write(str_line)
 
@@ -104,6 +108,19 @@ class Agent:
         #TODO: изменить на получение реальной цены
         price = random.randint(100, 1000)
         return price
+
+    def get_TP_SL(self, ticket: str) -> (float, float):
+        """ Получить значения для TakeProfit и StopLoss
+        Args:
+            ticket: название акции
+        Returns:
+            take_profit: значение тейк профит
+            stop_loss
+        """
+        #TODO: изменить на получение реальных значений
+        take_profit = random.randint(100, 1000)
+        stop_loss = random.randint(100, 1000)
+        return take_profit, stop_loss
 
     def count_stocks_values(self, prices_list: list, limit: int) -> list[tuple]:
         """ Посчитать соотношение акций к покупке
