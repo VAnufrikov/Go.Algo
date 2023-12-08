@@ -16,12 +16,14 @@ class Checker:
         self.file_path = Config.STOCKS_PATH
         self.last_checking = datetime.now() - timedelta(minutes=5)
 
+
     def timer(self):
         while True:
             if datetime.now() > self.last_checking + timedelta(minutes=5):
                 self.self.last_checking = datetime.now() 
                 self.start_checking()
     
+
     def start_checking(self):
         profit=0
         df = pd.read_csv(self.file_path)
@@ -36,7 +38,7 @@ class Checker:
             if current_price>take_profit or current_price<stop_loss:
                 agent.sell(ticket_name, count)
                 new_counts.append(0)
-                profit += current_price - buying_price
+                profit += count * (current_price - buying_price)
             else:
                 new_counts.append(count)
         df['count'] = new_counts
