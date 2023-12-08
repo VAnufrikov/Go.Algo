@@ -24,8 +24,10 @@ class Stocks:
     def get_time_baket(self, tiket, start, end):
         """Получаем бакет по которому будем получать информацию о тикете"""
 
-        data = upload_data_from_moexalgo(tiket, start, end)
+        tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, start, end)
 
-        data_tiket = data[data['secid'] == tiket].sort_values(by='tradedate', ascending=True)
+        tradestats = tradestats[tradestats['ticker'] == tiket].sort_values(by='tradedate', ascending=True)
+        orderstats = orderstats[orderstats['ticker'] == tiket].sort_values(by='tradedate', ascending=True)
+        obstats = obstats[obstats['ticker'] == tiket].sort_values(by='tradedate', ascending=True)
 
-        return data_tiket
+        return tradestats, orderstats, obstats

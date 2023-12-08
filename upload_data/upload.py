@@ -1,6 +1,7 @@
 from datetime import timedelta
 import pandas as pd
 import time
+from moexalgo import Ticker
 
 
 
@@ -16,31 +17,13 @@ def read_data_stock(srch):
 
     return df.reset_index(drop=True)
 
-def perdelta(start, end):
-    curr = start
-    while curr < end:
-        yield curr
-        curr += timedelta(days=1)
-
-def get_dates(DATE_START, DATE_END):
-    list_dates = []
-
-    for result in perdelta(DATE_START, DATE_END):
-        list_dates.append(result)
-
-    list_dates.append(DATE_END)
-
-    return list_dates
-
 
 def upload_data_from_moexalgo(TRADE_CODE, DATE_START, DATE_END):
     """Получаем данные по TRADE_CODE из moexalgo"""
-    dates = get_dates(DATE_START, DATE_END)
 
-    tradestats = pd.DataFrame()
-    for date in dates:
-        url = f'https://iss.moex.com/iss/datashop/algopack/eq/tradestats/{TRADE_CODE}.csv?from={date}&till={date}&iss.only=data'
-        df = pd.read_csv(url, sep=';', skiprows=1)
-        tradestats = pd.concat([tradestats, df])
-        time.sleep(0.5)
-    return tradestats
+    tiket = Ticker(TRADE_CODE)
+    orderstats = tiket.orderstats(date=DATE_START, till_date=DATE_END)
+    tradestats = tiket.tradestats(date=DATE_START, till_date=DATE_END)
+    obstats = tiket.obstats(date=DATE_START, till_date=DATE_END)
+
+    return tradestats, orderstats, obstats
