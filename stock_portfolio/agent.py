@@ -50,9 +50,10 @@ def clean_df_for_etna(df):
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
-    def __int__(self):
+    def __init__(self):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
+        self.profit = 0
 
     def predict(self, df):
         df.loc[:, 'trade_datetime'] = pd.to_datetime(df.tradedate.astype(str) + ' ' + df.tradetime.astype(str))
@@ -69,7 +70,7 @@ class Agent:
         если будет рост отдаем 1 
         если падение -1 
         если так же то ничего не делаем 
-         """
+        """
         return 0
 
     def by(self, ticket, count, price):
@@ -149,3 +150,12 @@ class Agent:
             ticket_name = stock_info[0]
             ticket_count = stock_info[1]
             self.by(ticket=ticket_name, count=ticket_count, price=stock_info[1])
+
+    def add_profit(self, profit: float) -> None:
+        """ Добавить профит за раунд
+        Args:
+            profit: названия акций для покупки
+        Returns:
+            None
+        """
+        self.profit += profit
