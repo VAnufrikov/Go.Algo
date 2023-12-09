@@ -1,4 +1,3 @@
-
 import etna
 import random
 
@@ -7,11 +6,10 @@ from datetime import timedelta
 
 import pandas as pd
 
-from settings import Config, LIMIT
+from settings import Config, DATE_START, DATE_END, LIMIT
 from datetime import datetime as dt
 from etna.datasets.tsdataset import TSDataset
 
-from stock_portfolio.portfolio import Stocks
 from sqlite.client import SQLiteClient
 
 client = SQLiteClient(Config.SQL_DATABASE_PATH)
@@ -21,10 +19,8 @@ from etna.models import CatBoostMultiSegmentModel
 from etna.pipeline import Pipeline
 from etna.transforms import DensityOutliersTransform, TimeSeriesImputerTransform, LinearTrendTransform, TrendTransform, \
     LagTransform, DateFlagsTransform, FourierTransform, SegmentEncoderTransform, MeanTransform
-from etna.analysis import plot_forecast
 from etna.metrics import SMAPE
 
-from settings import DATE_START, DATE_END, LIMIT, HORIZON
 from stock_portfolio.portfolio import get_tiket
 from upload_data.upload import upload_data_from_moexalgo
 import numpy as np
@@ -75,22 +71,22 @@ def etna_predict(param):
     my_plot(ts, segments=["vol"])
     my_plot(ts, segments=["val"])
 
-    train_ts, test_ts = ts.train_test_split(test_size=HORIZON)
+    train_ts, test_ts = ts.train_test_split(test_size=Config.HORIZON)
 
     transforms = [
         DensityOutliersTransform(in_column="target", distance_coef=3.0),
         TimeSeriesImputerTransform(in_column="target", strategy="forward_fill"),
         LinearTrendTransform(in_column="target"),
         TrendTransform(in_column="target", out_column="trend"),
-        LagTransform(in_column="target", lags=list(range(HORIZON, 122)), out_column="target_lag"),
+        LagTransform(in_column="target", lags=list(range(Config.HORIZON, 122)), out_column="target_lag"),
         DateFlagsTransform(week_number_in_month=True, out_column="date_flag"),
         FourierTransform(period=360.25, order=6, out_column="fourier"),
         SegmentEncoderTransform(),
-        MeanTransform(in_column=f"target_lag_{HORIZON}", window=12, seasonality=7),
-        MeanTransform(in_column=f"target_lag_{HORIZON}", window=7),
+        MeanTransform(in_column=f"target_lag_{Config.HORIZON}", window=12, seasonality=7),
+        MeanTransform(in_column=f"target_lag_{Config.HORIZON}", window=7),
     ]
 
-    pipeline, forecast_ts = etna_train(transforms, HORIZON, train_ts)
+    pipeline, forecast_ts = etna_train(transforms, Config.HORIZON, train_ts)
 
     # Сохраняем картинку
     my_plot_forecast(forecast_ts=forecast_ts, test_ts=test_ts, train_ts=train_ts, n_train_samples=50)
@@ -98,13 +94,6 @@ def etna_predict(param):
     smape = SMAPE()
     print(smape(y_true=test_ts, y_pred=forecast_ts))
 
-
-# <<<<<<< checker
-#     def __init__(self): 
-#         """Инициализация агента и его портфеля"""
-#         self.limit = LIMIT
-#         self.profit = 0 
-# =======
 
 def etna_train(transforms, HORIZON, train_ts):
     """Производим обучение модели по подготовленым данным"""
@@ -193,14 +182,6 @@ def predict(trade, order, obs):
     obs.rename(columns={'ts': 'trade_datetime'}, inplace=True)
 
 
-    # Создаем норм таймлайн для 3х датасетов
-    # trade['trade_datetime'] = pd.to_datetime(
-    #     trade.tradedate.astype(str) + ' ' + trade.tradetime.astype(str))
-    # order['trade_datetime'] = pd.to_datetime(
-    #     order.tradedate.astype(str) + ' ' + order.tradetime.astype(str))
-    # obs['trade_datetime'] = pd.to_datetime(
-    #     obs.tradedate.astype(str) + ' ' + obs.tradetime.astype(str))
-
     # Сохраняем исходные trade_datetime для визуализации
     list_trade_datetime_tradestats = trade['trade_datetime'].to_list()
     list_trade_datetime_orderstats = order['trade_datetime'].to_list()
@@ -208,6 +189,7 @@ def predict(trade, order, obs):
 
     df = clean_df_for_etna(order, trade, obs)
 
+    # Проверка DF перед загрузкой в ETNA
     # df.to_csv('df_before.csv', sep=';')
     #
     # df_1 = TSDataset.to_dataset(df)
@@ -235,6 +217,7 @@ class Agent:
     def __int__(self):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
+        self.profit = 0
 
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
