@@ -4,6 +4,8 @@ import os
 
 if __name__ == '__main__':
     """Запускаем бота и устанавливаем нужную библиотеку etna"""
+    # os.system("pip install --upgrade pip'")
+    # os.system("pip install etna'")
     # os.system("pip install 'etna[all]'")
 
     run_agent()
