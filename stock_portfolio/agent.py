@@ -12,6 +12,10 @@ from datetime import datetime as dt
 from etna.datasets.tsdataset import TSDataset
 
 from stock_portfolio.portfolio import Stocks
+from sqlite.client import SQLiteClient
+
+client = SQLiteClient(Config.SQL_DATABASE_PATH)
+client.connect()
 
 from etna.models import CatBoostMultiSegmentModel
 from etna.pipeline import Pipeline
@@ -94,6 +98,13 @@ def etna_predict(param):
     smape = SMAPE()
     print(smape(y_true=test_ts, y_pred=forecast_ts))
 
+
+# <<<<<<< checker
+#     def __init__(self): 
+#         """Инициализация агента и его портфеля"""
+#         self.limit = LIMIT
+#         self.profit = 0 
+# =======
 
 def etna_train(transforms, HORIZON, train_ts):
     """Производим обучение модели по подготовленым данным"""
@@ -181,6 +192,7 @@ def predict(trade, order, obs):
     order.rename(columns={'ts': 'trade_datetime'}, inplace=True)
     obs.rename(columns={'ts': 'trade_datetime'}, inplace=True)
 
+
     # Создаем норм таймлайн для 3х датасетов
     # trade['trade_datetime'] = pd.to_datetime(
     #     trade.tradedate.astype(str) + ' ' + trade.tradetime.astype(str))
@@ -227,12 +239,9 @@ class Agent:
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
         take_profit, stop_loss = self.get_TP_SL(ticket)
-        datetime = str(dt.now())
-        str_line = f"{datetime}|{ticket}|{price}|{count}|{take_profit}|{stop_loss}\n"
-        with open(Config.STOCKS_PATH, 'a') as fout:
-            fout.write(str_line)
+        client.insert_order(ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
 
-    def sell(self):
+    def sell(self, ticket_name, count):
         """Реализация выставление тикета в стакан на продажу"""
         pass
 
@@ -302,6 +311,25 @@ class Agent:
             ticket_name = stock_info[0]
             ticket_count = stock_info[1]
             self.by(ticket=ticket_name, count=ticket_count, price=stock_info[1])
+
+
+    def add_profit(self, profit: float) -> None:
+        """ Добавить профит за раунд
+        Args:
+            profit: названия акций для покупки
+        Returns:
+            None
+        """
+        self.profit += profit
+
+    def add_limit(self, sum: float) -> None:
+        """ Добавить деньги за продажу
+        Args:
+            profit: названия акций для покупки
+        Returns:
+            None
+        """
+        self.limit += sum
 
 def my_plot_forecast(
         forecast_ts: Union["TSDataset", List["TSDataset"], Dict[str, "TSDataset"]],

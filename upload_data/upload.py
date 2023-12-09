@@ -1,4 +1,11 @@
+
+from datetime import timedelta
+import pandas as pd
+import requests
+import time
+
 from datetime import time, datetime
+
 
 import pandas as pd
 from moexalgo import Ticker
@@ -70,4 +77,31 @@ def upload_data_from_moexalgo(TRADE_CODE, DATE_START, DATE_END):
     tradestats.rename(columns={'secid': 'ticker'}, inplace=True)
     # print('tradestats ready')
 
+# <<<<<<< checker
+# def upload_data_from_moexalgo(TRADE_CODE, DATE_START, DATE_END):
+#     """Получаем данные по TRADE_CODE из moexalgo"""
+#     dates = get_dates(DATE_START, DATE_END)
+
+#     tradestats = pd.DataFrame()
+#     for date in dates:
+#         url = f'https://iss.moex.com/iss/datashop/algopack/eq/tradestats/{TRADE_CODE}.csv?from={date}&till={date}&iss.only=data'
+#         df = pd.read_csv(url, sep=';', skiprows=1)
+#         tradestats = pd.concat([tradestats, df])
+#         time.sleep(0.5)
+#     return tradestats
+# =======
+
     return tradestats, orderstats, obstats
+
+def get_features_from_financialmodelingprep(ticket, token):
+    params = {
+         'period': 'annual',
+         'apikey': token#'USOBt2DLiRjcewpnT4gvsqvqIm3uiwAy',
+         }
+
+    response = requests.get(
+        f'https://financialmodelingprep.com/api/v3/income-statement/{ticket}',
+        params=params,
+
+    )
+    return response.json()[0]
