@@ -1,5 +1,6 @@
 from datetime import timedelta
 import pandas as pd
+import requests
 import time
 
 
@@ -44,3 +45,16 @@ def upload_data_from_moexalgo(TRADE_CODE, DATE_START, DATE_END):
         tradestats = pd.concat([tradestats, df])
         time.sleep(0.5)
     return tradestats
+
+def get_features_from_financialmodelingprep(ticket, token):
+    params = {
+         'period': 'annual',
+         'apikey': token#'USOBt2DLiRjcewpnT4gvsqvqIm3uiwAy',
+         }
+
+    response = requests.get(
+        f'https://financialmodelingprep.com/api/v3/income-statement/{ticket}',
+        params=params,
+
+    )
+    return response.json()[0]
