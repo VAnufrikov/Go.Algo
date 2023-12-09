@@ -7,3 +7,4 @@ class Config:
     SRCH_MOEX = 'data/ListingSecurityList.csv'
     DATE_START = date(2023, 10, 1)
     DATE_END = date(2023, 10, 10)
+    SQL_DATABASE_PATH = 'stock_portfolio.db'

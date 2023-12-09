@@ -6,6 +6,10 @@ from settings import Config, LIMIT
 from datetime import datetime as dt
 from etna.datasets.tsdataset import TSDataset
 from stock_portfolio.portfolio import Stocks
+from sqlite.client import SQLiteClient
+
+client = SQLiteClient(Config.SQL_DATABASE_PATH)
+client.connect()
 
 
 def run_agent():
@@ -76,12 +80,9 @@ class Agent:
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
         take_profit, stop_loss = self.get_TP_SL(ticket)
-        datetime = str(dt.now())
-        str_line = f"{datetime}|{ticket}|{price}|{count}|{take_profit}|{stop_loss}\n"
-        with open(Config.STOCKS_PATH, 'a') as fout:
-            fout.write(str_line)
+        client.insert_order(ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
 
-    def sell(self):
+    def sell(self, ticket_name, count):
         """Реализация выставление тикета в стакан на продажу"""
         pass
 
@@ -159,3 +160,12 @@ class Agent:
             None
         """
         self.profit += profit
+
+    def add_limit(self, sum: float) -> None:
+        """ Добавить деньги за продажу
+        Args:
+            profit: названия акций для покупки
+        Returns:
+            None
+        """
+        self.limit += sum

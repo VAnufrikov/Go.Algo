@@ -1,12 +1,14 @@
 import pandas as pd
 
 from settings import Config
+from sqlite.client import SQLiteClient
 from datetime import datetime, timedelta
 from stock_portfolio.agent import Agent
 
 
 agent = Agent()
-
+sql_client = SQLiteClient(Config.SQL_DATABASE_PATH)
+sql_client.connect()
 
 
 class Checker:
@@ -26,21 +28,18 @@ class Checker:
 
     def start_checking(self):
         profit=0
-        df = pd.read_csv(self.file_path)
-        new_counts = []
-        for line in df.values():
-            ticket_name = line[1]
-            count = line[2]
-            buying_price = line[3]
-            take_profit = line[4]
-            stop_loss = line[5]
-            current_price = agent.get_ticket_price(ticket_name)
-            if current_price>take_profit or current_price<stop_loss:
-                agent.sell(ticket_name, count)
-                new_counts.append(0)
-                profit += count * (current_price - buying_price)
-            else:
-                new_counts.append(count)
-        df['count'] = new_counts
-        df.to_csv(self.file_path, index=False)
-        agent.add_profit(profit)
+        orders = sql_client.select_all_orders()
+        if orders:
+            for line in orders:
+                ticket_name = line[1]
+                _, buying_price = sql_client.select_stock_count_and_price_in_portfolio(ticket_name)
+                count = line[2]
+                take_profit = line[3]
+                stop_loss = line[4]
+                current_price = agent.get_ticket_price(ticket_name)
+                if current_price>take_profit or current_price<stop_loss:
+                    sum = agent.sell(ticket_name, count)
+                    profit += count * (current_price - buying_price)
+
+            agent.add_profit(profit)
+            agent.add_free_sum(sum)
