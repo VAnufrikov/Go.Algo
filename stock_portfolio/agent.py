@@ -493,19 +493,13 @@ class Agent:
             :param portfel_take_profit: list
         """
         max_price_for_one_bucket = self.limit / len(portfel_last_price)
-        # self.count_stocks_values(portfel_last_price, self.limit)
 
         for i in range(len(portfel_tikets)):
             if portfel_last_price[i] <= max_price_for_one_bucket:
-                self.by(ticket=portfel_tikets[i], count=ticket_count, price=stock_info[1], take_profit, stop_loss)
+                ticket_count = max_price_for_one_bucket // portfel_last_price[i]
 
+                self.by(ticket=portfel_tikets[i], count=ticket_count, price=portfel_last_price[i], take_profit=portfel_take_profit[i], stop_loss=portfel_stop_loss[i])
 
-        # prices_list = portfel_tikets
-        # stocks_count = self.count_stocks_values(portfel_last_price, self.limit)
-        # for stock_info in stocks_count:
-        #     ticket_name = stock_info[0]
-        #     ticket_count = stock_info[1]
-        #     self.by(ticket=ticket_name, count=ticket_count, price=stock_info[1], take_profit, stop_loss)
 
     def add_profit(self, profit: float) -> None:
         """ Добавить профит за раунд
