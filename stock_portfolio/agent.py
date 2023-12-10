@@ -239,14 +239,14 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
         forecast_ts=forecast_ts, test_ts=test_ts, train_ts=train_ts, n_train_samples=50
     )
 
-    if segment == "vol":
-        print(f"start_backtest {segment}")
-        metrics_df, forecast_df, fold_info_df = pipeline.backtest(
-            ts=ts, metrics=[MAE(), MSE(), SMAPE()], n_folds=5, mode="expand", n_jobs=-1
-        )
-
-        my_plot_backtest(forecast_df, ts)
-        print(metrics_df.head(100))
+    # if segment == "vol":
+    #     print(f"start_backtest {segment}")
+    #     metrics_df, forecast_df, fold_info_df = pipeline.backtest(
+    #         ts=ts, metrics=[MAE(), MSE(), SMAPE()], n_folds=5, mode="expand", n_jobs=-1
+    #     )
+    #
+    #     my_plot_backtest(forecast_df, ts)
+    #     print(metrics_df.head(100))
     # metricSMAPE = SMAPE(y_true=test_ts, y_pred=forecast_ts)
     # metricMAE = mae(y_true=test_ts, y_pred=forecast_ts)
     # metricMSE = MSE(y_true=test_ts, y_pred=forecast_ts)
