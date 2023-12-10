@@ -17,5 +17,6 @@ python3 -m isort settings.py
 python3 -m isort main.py
 
 python3 -m pip3 install --upgrade pip
+python3 -m pip3 install news_regressor/requirements.txt
 python3 -m pip3 install requirements.txt
 python3 -m main.py
