@@ -13,7 +13,7 @@ from datetime import timedelta
 import pandas as pd
 from matplotlib.lines import Line2D
 
-from settings import Config, DATE_START, DATE_END, LIMIT
+from settings import Config, DATE_START, DATE_END, LIMIT, HORIZON
 from datetime import datetime as dt
 from etna.datasets.tsdataset import TSDataset
 
@@ -44,7 +44,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-from settings import Config
 from upload_data.Ranking import ranking
 from upload_data.upload import read_data_stock
 
@@ -107,7 +106,7 @@ def make_indicators(df: pd.DataFrame):
 def get_min_max_support(df):
     """Расчет уровней поддежки по 52 бакетам"""
 
-    shift = Config.HORIZON + 52
+    shift = HORIZON + 52
 
     df = df.iloc[-shift:].head(52)
 
@@ -121,10 +120,10 @@ def get_min_max_support(df):
 
 
 def run_agent(horizon, uuid):
-        """Входом будет получение датасета за прошлые даты,
+    """Входом будет получение датасета за прошлые даты,
                     выход решение о покупке или продаже """
-        agent = Agent(uuid)
-        NR = NewsRegressor()
+    agent = Agent(uuid)
+    NR = NewsRegressor()
     """
     Тут мы должны получать по каждому тикету 
     предикт на стоимость портфеля и далее анализировать какую часть портфеля
@@ -157,22 +156,22 @@ def run_agent(horizon, uuid):
 
         if inside == 1:
             agent.by()
-            
+
         elif inside == -1:
             agent.sell()
         else:
             agent.do_nofing()
-            
-        new_horizon = horizon - 1
-        if new_horizon == 1:
-            agent.close_day()
-        
-        return new_horizon
+
+    new_horizon = HORIZON - 1
+    if new_horizon == 1:
+        agent.close_day()
+
+    return new_horizon
 
 
 
 def etna_predict(param, segment, horizon):
-    """Предсказываем наши временные ряды по 3м сегментам"""
+    """Предсказываем наши временные ряды по сегменту"""
     ts = TSDataset(param, freq="T")
 
     train_ts, test_ts = ts.train_test_split(test_size=horizon)
@@ -429,7 +428,7 @@ class Agent:
             :param ticket: Тикет по которому хотим узнать цену
             :param df: DataFrame - с ценой акции
         """
-        shift = Config.HORIZON + 1
+        shift = HORIZON + 1
 
         df = df.iloc[-shift:].head(1)
 
