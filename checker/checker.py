@@ -28,18 +28,18 @@ class Checker:
 
     def start_checking(self):
         profit=0
-        orders = sql_client.select_all_orders()
+        orders = sql_client.select_all_orders(bot_id=agent.uuid)
         if orders:
             for line in orders:
                 ticket_name = line[1]
-                _, buying_price = sql_client.select_stock_count_and_price_in_portfolio(ticket_name)
+                _, buying_price = sql_client.select_stock_count_and_price_in_portfolio(ticket=ticket_name, bot_id=agent.uuid)
                 count = line[2]
                 take_profit = line[3]
                 stop_loss = line[4]
                 current_price = agent.get_ticket_price(ticket_name)
                 if current_price>take_profit or current_price<stop_loss:
-                    sum = agent.sell(ticket_name, count)
+                    agent.sell(ticket_name, count)
+                    sum = sql_client.sell_stock(ticket=ticket_name, count=count, bot_id=agent.uuid)
                     profit += count * (current_price - buying_price)
-
             agent.add_profit(profit)
-            agent.add_free_sum(sum)
+            agent.add_limit(sum)

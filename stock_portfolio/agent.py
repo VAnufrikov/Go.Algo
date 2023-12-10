@@ -1,4 +1,5 @@
 import itertools
+from uuid import uuid4
 
 import etna
 import random
@@ -365,16 +366,18 @@ def predict(trade, order, obs):
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
-    def __int__(self):
+    def __init__(self):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
         self.profit = 0
+        self.uuid = uuid4()
 
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
         take_profit, stop_loss = self.get_TP_SL(ticket)
-        client.insert_order(ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
+        client.insert_order(bot_id=self.uuid, ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
         # TODO insert в портфель
+
 
     def sell(self, ticket_name, count):
         """Реализация выставление тикета в стакан на продажу"""
