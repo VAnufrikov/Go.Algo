@@ -44,8 +44,12 @@ class SQLiteClient:
         return self.execute(insert_query)
 
     def insert_stock(self, bot_id, ticket, count, buying_price):
-        current_count, current_price = self.select_stock_count_and_price_in_portfolio(bot_id=bot_id, ticket=ticket)
-        new_mean_price = (current_price*current_count + count*buying_price)/(current_count+count)
+        current_count, current_price = self.select_stock_count_and_price_in_portfolio(
+            bot_id=bot_id, ticket=ticket
+        )
+        new_mean_price = (current_price * current_count + count * buying_price) / (
+            current_count + count
+        )
         count += current_count
         remove_query = f"""DELETE FROM stock_portfolio WHERE ticket=="{ticket}" AND bot_id=="{bot_id}" """
         self.execute(remove_query)
@@ -53,9 +57,10 @@ class SQLiteClient:
             VALUES ('{bot_id}', '{ticket}', {count}, {new_mean_price});"""
         return self.execute(insert_query)
 
-
     def sell_stock(self, bot_id, ticket, count):
-        current_count, current_price = self.select_stock_count_and_price_in_portfolio(bot_id=bot_id, ticket=ticket)
+        current_count, current_price = self.select_stock_count_and_price_in_portfolio(
+            bot_id=bot_id, ticket=ticket
+        )
         profit = current_price * count
         new_count = current_count - count
         remove_query = f"""DELETE FROM stock_portfolio WHERE ticket=="{ticket}" AND bot_id=="{bot_id}" """
@@ -66,16 +71,15 @@ class SQLiteClient:
         return profit
 
     def select_all_orders(self, bot_id):
-        select_all_query= f"""SELECT * from orders WHERE bot_id=="{bot_id}" """
+        select_all_query = f"""SELECT * from orders WHERE bot_id=="{bot_id}" """
         return self.execute(select_all_query)
 
     def select_all_portfolio_stocks(self, bot_id):
-
-        select_all_query= """SELECT * from stock_portfolio WHERE bot_id=="{bot_id}" """
+        select_all_query = """SELECT * from stock_portfolio WHERE bot_id=="{bot_id}" """
         return self.execute(select_all_query)
 
     def select_stock_count_and_price_in_portfolio(self, bot_id, ticket):
-        select_stock_count= f"""SELECT count, buying_price
+        select_stock_count = f"""SELECT count, buying_price
             FROM stock_portfolio
             WHERE ticket=="{ticket}" AND bot_id=="{bot_id}" """
         count = self.execute(select_stock_count)
@@ -85,7 +89,7 @@ class SQLiteClient:
             return 0, 0
 
     def select_stock_count_in_orders(self, bot_id, ticket):
-        select_stock_count= f"""SELECT count
+        select_stock_count = f"""SELECT count
             FROM orders
             WHERE ticket=="{ticket}" AND bot_id=="{bot_id}" """
         count = self.execute(select_stock_count)
@@ -95,5 +99,7 @@ class SQLiteClient:
             return 0
 
     def close_order(self, order_id, bot_id):
-        remove_query = f"""DELETE FROM orders WHERE order_id={order_id} AND bot_id=="{bot_id}" """
+        remove_query = (
+            f"""DELETE FROM orders WHERE order_id={order_id} AND bot_id=="{bot_id}" """
+        )
         return self.execute(remove_query)

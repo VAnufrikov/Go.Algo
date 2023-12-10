@@ -1,52 +1,50 @@
 import itertools
+import math
+import random
+from datetime import datetime as dt
+from datetime import timedelta
 from uuid import uuid4
 
-from news_regressor.news_regressor import NewsRegressor
-
 import etna
-import random
-
-import math
-from datetime import timedelta
-
 import pandas as pd
+from etna.datasets.tsdataset import TSDataset
 from matplotlib.lines import Line2D
 
-from settings import Config, DATE_START, DATE_END, LIMIT, HORIZON
-from datetime import datetime as dt
-from etna.datasets.tsdataset import TSDataset
-
+from news_regressor.news_regressor import NewsRegressor
+from settings import DATE_END, DATE_START, HORIZON, LIMIT, Config
 from sqlite.client import SQLiteClient
 
 client = SQLiteClient(Config.SQL_DATABASE_PATH)
 client.connect()
 
+import warnings
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+from etna.analysis.forecast.utils import (_prepare_forecast_results,
+                                          _select_quantiles,
+                                          _validate_intersecting_segments)
+from etna.analysis.utils import _prepare_axes
+from etna.metrics import MAE, MSE, SMAPE, smape
 from etna.models import CatBoostMultiSegmentModel
 from etna.pipeline import Pipeline
-from etna.transforms import DensityOutliersTransform, TimeSeriesImputerTransform, LinearTrendTransform, TrendTransform, \
-    LagTransform, DateFlagsTransform, FourierTransform, SegmentEncoderTransform, MeanTransform, HolidayTransform
-from etna.metrics import SMAPE, MAE, MSE, smape
+from etna.transforms import (DateFlagsTransform, DensityOutliersTransform,
+                             FourierTransform, HolidayTransform, LagTransform,
+                             LinearTrendTransform, MeanTransform,
+                             SegmentEncoderTransform,
+                             TimeSeriesImputerTransform, TrendTransform)
 
 from upload_data.upload import upload_data_from_moexalgo
-import numpy as np
-from etna.analysis.utils import _prepare_axes
-from etna.analysis.forecast.utils import _prepare_forecast_results, _select_quantiles, _validate_intersecting_segments
-
-from typing import Dict, Sequence, Literal, Tuple, Any
-from typing import List
-from typing import Optional
-from typing import Tuple
-from typing import Union
-import matplotlib.pyplot as plt
-
-import warnings
 
 warnings.filterwarnings("ignore")
 
 from upload_data.Ranking import ranking
 from upload_data.upload import read_data_stock
 
-ALL_PREDICT_DATA_FROM_ETNA = pd.DataFrame(columns=['timestamp', 'segment', 'target', 'trade_datetime'])
+ALL_PREDICT_DATA_FROM_ETNA = pd.DataFrame(
+    columns=["timestamp", "segment", "target", "trade_datetime"]
+)
 
 
 def get_tiket():
@@ -59,43 +57,49 @@ def get_tiket():
 
 def make_indicators(df: pd.DataFrame):
     """Simple Moving Average: https://site.financialmodelingprep.com/developer/docs/technical-intraday-sma
-       Exponential Moving Average: https://site.financialmodelingprep.com/developer/docs/technical-intraday-ema
-       Weighted Moving Average: https://site.financialmodelingprep.com/developer/docs/technical-intraday-wma
-       Double EMA: https://site.financialmodelingprep.com/developer/docs/technical-intraday-dema
+    Exponential Moving Average: https://site.financialmodelingprep.com/developer/docs/technical-intraday-ema
+    Weighted Moving Average: https://site.financialmodelingprep.com/developer/docs/technical-intraday-wma
+    Double EMA: https://site.financialmodelingprep.com/developer/docs/technical-intraday-dema
 
     """
-    pr_high = df[['segment'] == 'pr_high'].reset_index(drop=True)
-    pr_low = df[['segment'] == 'pr_low'].reset_index(drop=True)
-    df = df[['segment'] == 'price'].reset_index(drop=True)
+    pr_high = df[["segment"] == "pr_high"].reset_index(drop=True)
+    pr_low = df[["segment"] == "pr_low"].reset_index(drop=True)
+    df = df[["segment"] == "price"].reset_index(drop=True)
 
-    ema = df['target'].ewm(span=50, adjust=False).mean()
+    ema = df["target"].ewm(span=50, adjust=False).mean()
 
-    df['50-baket-EMA'] = ema
-    df['200-baket-SMA'] = df['target'].rolling(window=200).mean()
+    df["50-baket-EMA"] = ema
+    df["200-baket-SMA"] = df["target"].rolling(window=200).mean()
 
     # Рассчет взвешенной скользящей средней (WMA)
     n = 50  # количество дней для взвешенной скользящей средней
     weights = pd.Series(range(1, n + 1))  # создание весов
-    wma = df['target'].rolling(window=n).apply(lambda prices: (prices * weights).sum() / weights.sum(), raw=True)
+    wma = (
+        df["target"]
+        .rolling(window=n)
+        .apply(lambda prices: (prices * weights).sum() / weights.sum(), raw=True)
+    )
 
-    df['50-baket-WMA'] = wma
+    df["50-baket-WMA"] = wma
 
     # Считаем DEMA от ema индикатора
     dema = 2 * ema - ema.ewm(span=50, adjust=False).mean()
-    df['50-baket-DEMA'] = 2 * ema - dema
+    df["50-baket-DEMA"] = 2 * ema - dema
 
     # Считаем TEMA от ema индикатора
-    EMA1 = df['target'].ewm(span=50, adjust=False).mean()
+    EMA1 = df["target"].ewm(span=50, adjust=False).mean()
     EMA2 = EMA1.ewm(span=50, adjust=False).mean()
-    df['50-baket-TEMA'] = 3 * EMA1 - 3 * EMA2 + df['target'].ewm(span=50, adjust=False).mean()
+    df["50-baket-TEMA"] = (
+        3 * EMA1 - 3 * EMA2 + df["target"].ewm(span=50, adjust=False).mean()
+    )
 
     # williams
-    high = pr_high['target'].rolling(window=14).max()
-    low = pr_low['target'].rolling(window=14).min()
-    df = df['target']
+    high = pr_high["target"].rolling(window=14).max()
+    low = pr_low["target"].rolling(window=14).min()
+    df = df["target"]
     williams = ((high - df) / (high - low)) * -100
 
-    df['14-baket-WILLIAMS'] = williams
+    df["14-baket-WILLIAMS"] = williams
 
     # TODO Relative Strength Index
     # TODO Average Directional Index
@@ -114,15 +118,15 @@ def get_min_max_support(df):
     # make_indicators(df)
     # TODO нужно потом применить индикаторы для расчета уровней поддежки по 52 бакета
 
-    max_support = df['target'].max()
-    min_support = df['target'].min()
+    max_support = df["target"].max()
+    min_support = df["target"].min()
 
     return max_support, min_support
 
 
 def run_agent(horizon, uuid):
     """Входом будет получение датасета за прошлые даты,
-                    выход решение о покупке или продаже """
+    выход решение о покупке или продаже"""
     agent = Agent(uuid)
     NR = NewsRegressor()
     """
@@ -139,11 +143,13 @@ def run_agent(horizon, uuid):
         portfel_take_profit = []
 
         for tiket in get_tiket():
-            tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
+            tradestats, orderstats, obstats = upload_data_from_moexalgo(
+                tiket, DATE_START, DATE_END
+            )
 
             inside = predict(tradestats, orderstats, obstats, HORIZON)
 
-            df_price = inside[['segment'] == 'price'].reset_index(drop=True)
+            df_price = inside[["segment"] == "price"].reset_index(drop=True)
 
             last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
@@ -165,14 +171,15 @@ def run_agent(horizon, uuid):
             else:
                 agent.do_nofing(tiket, date_time, last_price, take_profit, predict_news)
 
-        agent.fill_stock_portfolio(portfel_tikets, portfel_last_price, portfel_stop_loss, portfel_take_profit)
+        agent.fill_stock_portfolio(
+            portfel_tikets, portfel_last_price, portfel_stop_loss, portfel_take_profit
+        )
 
     new_horizon = HORIZON - 1
     if new_horizon == 1:
         agent.close_day()
 
     return new_horizon
-
 
 
 def etna_predict(param, segment, horizon):
@@ -186,18 +193,21 @@ def etna_predict(param, segment, horizon):
         TimeSeriesImputerTransform(in_column="target", strategy="forward_fill"),
         LinearTrendTransform(in_column="target"),
         TrendTransform(in_column="target", out_column="trend"),
-        LagTransform(in_column="target", lags=list(range(horizon, 122)), out_column="target_lag"),
+        LagTransform(
+            in_column="target", lags=list(range(horizon, 122)), out_column="target_lag"
+        ),
         DateFlagsTransform(week_number_in_month=True, out_column="date_flag"),
         FourierTransform(period=360.25, order=6, out_column="fourier"),
         SegmentEncoderTransform(),
         MeanTransform(in_column=f"target_lag_{horizon}", window=12, seasonality=7),
         MeanTransform(in_column=f"target_lag_{horizon}", window=7),
-        DateFlagsTransform(out_column="date_flags",
-                           day_number_in_week=True,
-                           day_number_in_month=True,
-                           week_number_in_month=True,
-                           is_weekend=True,
-                           ),
+        DateFlagsTransform(
+            out_column="date_flags",
+            day_number_in_week=True,
+            day_number_in_month=True,
+            week_number_in_month=True,
+            is_weekend=True,
+        ),
         HolidayTransform(out_column="holiday", iso_code="RU"),
     ]
 
@@ -206,10 +216,13 @@ def etna_predict(param, segment, horizon):
     # Сохраняем картинки
     save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment)
 
-    df = pd.concat([
-        train_ts.to_pandas(True)[['timestamp', 'segment', 'target']],
-        forecast_ts.to_pandas(True)[['timestamp', 'segment', 'target']]
-    ], ignore_index=True).reset_index(drop=True)
+    df = pd.concat(
+        [
+            train_ts.to_pandas(True)[["timestamp", "segment", "target"]],
+            forecast_ts.to_pandas(True)[["timestamp", "segment", "target"]],
+        ],
+        ignore_index=True,
+    ).reset_index(drop=True)
 
     return df
 
@@ -218,7 +231,9 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
     """Сохраняем картинки для анализа обучения"""
     my_plot(ts, segments=[segment])
 
-    my_plot_forecast(forecast_ts=forecast_ts, test_ts=test_ts, train_ts=train_ts, n_train_samples=50)
+    my_plot_forecast(
+        forecast_ts=forecast_ts, test_ts=test_ts, train_ts=train_ts, n_train_samples=50
+    )
 
     # if segment == 'price':
     #     print(f'start_backtest {segment}')
@@ -227,11 +242,13 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
     #
     #     my_plot_backtest(forecast_df, ts)
     #     print(metrics_df.head(100))
-
+    metricSMAPE = SMAPE(y_true=test_ts, y_pred=forecast_ts)
+    # metricMAE = mae(y_true=test_ts, y_pred=forecast_ts)
+    # metricMSE = MSE(y_true=test_ts, y_pred=forecast_ts)
     # TODO Исправить метрики !!!!!!
-    print(f'{segment} SMAPE = {SMAPE(y_true=test_ts, y_pred=forecast_ts)}')
-    print(f'{segment} MAE = {MAE(y_true=test_ts, y_pred=forecast_ts)}')
-    print(f'{segment} MSE = {MSE(y_true=test_ts, y_pred=forecast_ts)}')
+    print(f"{segment} SMAPE = {metricSMAPE}")
+    # print(f'{segment} MAE = {metricMAE}')
+    # print(f'{segment} MSE = {metricMSE}')
 
 
 def etna_train(transforms, horizon, train_ts):
@@ -248,97 +265,103 @@ def etna_train(transforms, horizon, train_ts):
 
 def make_fake_datetime(df):
     """Создаем непрерывный временной ряд для etna"""
-    start = df['trade_datetime'][0]
+    start = df["trade_datetime"][0]
 
     list_datetime = []
 
-    for i in range(len(df['trade_datetime'])):
+    for i in range(len(df["trade_datetime"])):
         if i == 0:
             list_datetime.append(start)
         else:
             start = list_datetime[i - 1]
             list_datetime.append(start + timedelta(minutes=1))
 
-    df['fake_datetime'] = list_datetime
+    df["fake_datetime"] = list_datetime
     return df
 
 
 def clean_df_for_etna(orderstats, tradestats, obstats):
-    tradestats['segment_p'] = 'price'
-    tradestats['segment_pr_high'] = 'pr_high'
-    tradestats['segment_pr_low'] = 'pr_low'
-    orderstats['segment_vol'] = 'vol'
-    obstats['segment_val'] = 'val'
+    tradestats["segment_p"] = "price"
+    tradestats["segment_pr_high"] = "pr_high"
+    tradestats["segment_pr_low"] = "pr_low"
+    orderstats["segment_vol"] = "vol"
+    obstats["segment_val"] = "val"
 
     # Предиктим цену pr_high
-    open = tradestats[['trade_datetime', 'segment_price_open', 'pr_high']]
-    median_open = tradestats['pr_high'].median()
+    open = tradestats[["trade_datetime", "segment_pr_high", "pr_high"]]
+    median_open = tradestats["pr_high"].median()
 
-    open['pr_high'] = tradestats['pr_high'] - median_open
+    open["pr_high"] = tradestats["pr_high"] - median_open
 
     open = make_fake_datetime(open)
-    open.pop('trade_datetime')
-    open = open[['fake_datetime', 'segment_price_open', 'pr_high']]
+    open.pop("trade_datetime")
+    open = open[["fake_datetime", "segment_pr_high", "pr_high"]]
 
     # Предиктим цену pr_low
-    pr_low = tradestats[['trade_datetime', 'segment_price_open', 'pr_low']]
-    median_pr_low = tradestats['pr_low'].median()
+    pr_low = tradestats[["trade_datetime", "segment_pr_low", "pr_low"]]
+    median_pr_low = tradestats["pr_low"].median()
 
-    pr_low['pr_low'] = tradestats['pr_low'] - median_pr_low
+    pr_low["pr_low"] = tradestats["pr_low"] - median_pr_low
 
     pr_low = make_fake_datetime(pr_low)
-    pr_low.pop('trade_datetime')
-    pr_low = pr_low[['fake_datetime', 'segment_price_open', 'pr_low']]
+    pr_low.pop("trade_datetime")
+    pr_low = pr_low[["fake_datetime", "segment_pr_low", "pr_low"]]
 
     # Предиктим цену закрытия
-    tradestats = tradestats[['trade_datetime', 'segment_p', 'pr_close']]
-    median_tradestats = tradestats['pr_close'].median()
+    tradestats = tradestats[["trade_datetime", "segment_p", "pr_close"]]
+    median_tradestats = tradestats["pr_close"].median()
 
-    tradestats['pr_close'] = tradestats['pr_close'] - median_tradestats
+    tradestats["pr_close"] = tradestats["pr_close"] - median_tradestats
 
     tradestats = make_fake_datetime(tradestats)
-    tradestats.pop('trade_datetime')
-    tradestats = tradestats[['fake_datetime', 'segment_p', 'pr_close']]
+    tradestats.pop("trade_datetime")
+    tradestats = tradestats[["fake_datetime", "segment_p", "pr_close"]]
 
     # Предиктим обьем продаж по позиции
-    orderstats['vol_true_put'] = orderstats['put_vol_s'] - orderstats['cancel_vol_s']
-    median_orderstats = orderstats['vol_true_put'].median()
+    orderstats["vol_true_put"] = orderstats["put_vol_s"] - orderstats["cancel_vol_s"]
+    median_orderstats = orderstats["vol_true_put"].median()
 
-    orderstats['vol_true_put'] = orderstats['vol_true_put'] - median_orderstats
+    orderstats["vol_true_put"] = orderstats["vol_true_put"] - median_orderstats
 
-    orderstats = orderstats[['trade_datetime', 'segment_vol', 'vol_true_put']]
+    orderstats = orderstats[["trade_datetime", "segment_vol", "vol_true_put"]]
     orderstats = make_fake_datetime(orderstats)
-    orderstats.pop('trade_datetime')
-    orderstats = orderstats[['fake_datetime', 'segment_vol', 'vol_true_put']]
+    orderstats.pop("trade_datetime")
+    orderstats = orderstats[["fake_datetime", "segment_vol", "vol_true_put"]]
 
     # Предиктим количество заявок которые доступно если все смогут и купить и продать
     # По сути смотрим тренд по заявкам
-    obstats['val_true_trend'] = obstats['val_b'] - obstats['val_s']
-    obstats = obstats[['trade_datetime', 'segment_val', 'val_true_trend']]
+    obstats["val_true_trend"] = obstats["val_b"] - obstats["val_s"]
+    obstats = obstats[["trade_datetime", "segment_val", "val_true_trend"]]
     obstats = make_fake_datetime(obstats)
-    obstats.pop('trade_datetime')
-    obstats = obstats[['fake_datetime', 'segment_val', 'val_true_trend']]
+    obstats.pop("trade_datetime")
+    obstats = obstats[["fake_datetime", "segment_val", "val_true_trend"]]
 
     # На случай если у нас не совпадают df.shape
     res = tradestats.merge(orderstats).merge(obstats).merge(open).merge(pr_low)
 
-    tradestats = res[['fake_datetime', 'segment_p', 'pr_close']]
-    orderstats = res[['fake_datetime', 'segment_vol', 'vol_true_put']]
-    obstats = res[['fake_datetime', 'segment_val', 'val_true_trend']]
-    open = res[['fake_datetime', 'segment_price_open', 'pr_high']]
-    pr_low = res[['fake_datetime', 'segment_price_open', 'pr_high']]
+    tradestats = res[["fake_datetime", "segment_p", "pr_close"]]
+    orderstats = res[["fake_datetime", "segment_vol", "vol_true_put"]]
+    obstats = res[["fake_datetime", "segment_val", "val_true_trend"]]
+    open = res[["fake_datetime", "segment_pr_high", "pr_high"]]
+    pr_low = res[["fake_datetime", "segment_pr_low", "pr_high"]]
 
-    tradestats.columns = ['timestamp', 'segment', 'target']
-    orderstats.columns = ['timestamp', 'segment', 'target']
-    obstats.columns = ['timestamp', 'segment', 'target']
-    open.columns = ['timestamp', 'segment', 'target']
-    pr_low.columns = ['timestamp', 'segment', 'target']
+    tradestats.columns = ["timestamp", "segment", "target"]
+    orderstats.columns = ["timestamp", "segment", "target"]
+    obstats.columns = ["timestamp", "segment", "target"]
+    open.columns = ["timestamp", "segment", "target"]
+    pr_low.columns = ["timestamp", "segment", "target"]
 
-    df = pd.concat([
-        tradestats, orderstats, obstats, open, pr_low
-    ], ignore_index=True).reset_index(drop=True)
+    df = pd.concat(
+        [tradestats, orderstats, obstats, open, pr_low], ignore_index=True
+    ).reset_index(drop=True)
 
-    return df[['timestamp', 'segment', 'target']], median_tradestats, median_orderstats, median_open, median_pr_low
+    return (
+        df[["timestamp", "segment", "target"]],
+        median_tradestats,
+        median_orderstats,
+        median_open,
+        median_pr_low,
+    )
 
 
 def predict(trade, order, obs, horizon):
@@ -347,47 +370,50 @@ def predict(trade, order, obs, horizon):
     если падение -1
     если так же то ничего не делаем
     """
-    trade.rename(columns={'ts': 'trade_datetime'}, inplace=True)
-    order.rename(columns={'ts': 'trade_datetime'}, inplace=True)
-    obs.rename(columns={'ts': 'trade_datetime'}, inplace=True)
+    trade.rename(columns={"ts": "trade_datetime"}, inplace=True)
+    order.rename(columns={"ts": "trade_datetime"}, inplace=True)
+    obs.rename(columns={"ts": "trade_datetime"}, inplace=True)
 
     # Сохраняем исходные trade_datetime для визуализации
-    list_trade_datetime_tradestats = trade['trade_datetime'].to_list()
+    list_trade_datetime_tradestats = trade["trade_datetime"].to_list()
 
-    df, median_tradestats, median_orderstats, median_open, median_pr_low = clean_df_for_etna(order, trade, obs)
+    (
+        df,
+        median_tradestats,
+        median_orderstats,
+        median_open,
+        median_pr_low,
+    ) = clean_df_for_etna(order, trade, obs)
 
-    predict = pd.DataFrame(columns=['timestamp', 'segment', 'target', 'trade_datetime'])
+    predict = pd.DataFrame(columns=["timestamp", "segment", "target", "trade_datetime"])
 
-    for segment in df['segment'].unique().tolist():
-        df_temp = df[df['segment'] == segment]
+    for segment in df["segment"].unique().tolist():
+        df_temp = df[df["segment"] == segment]
 
         predict_temp = etna_predict(TSDataset.to_dataset(df_temp), segment, horizon)
-        print(f'{segment} predict ready')
+        print(f"{segment} predict ready")
 
+        predict_temp["trade_datetime"] = list_trade_datetime_tradestats
 
-        predict_temp['trade_datetime'] = list_trade_datetime_tradestats
+        if segment == "tradestats":
+            predict_temp["target"] = predict_temp["target"] + median_tradestats
 
-        if segment == 'tradestats':
-            predict_temp['target'] = predict_temp['target'] + median_tradestats
+        if segment == "orderstats":
+            predict_temp["target"] = predict_temp["target"] + median_orderstats
 
-        if segment == 'orderstats':
-            predict_temp['target'] = predict_temp['target'] + median_orderstats
+        if segment == "pr_high":
+            predict_temp["target"] = predict_temp["target"] + median_open
 
-        if segment == 'pr_high':
-            predict_temp['target'] = predict_temp['target'] + median_open
+        if segment == "pr_low":
+            predict_temp["target"] = predict_temp["target"] + median_pr_low
 
-        if segment == 'pr_low':
-            predict_temp['target'] = predict_temp['target'] + median_pr_low
-
-        predict = pd.concat([
-            predict,
-            predict_temp
-        ], ignore_index=True).reset_index(drop=True)
+        predict = pd.concat([predict, predict_temp], ignore_index=True).reset_index(
+            drop=True
+        )
 
     print(predict.info())
 
     return predict
-
 
 
 class Agent:
@@ -399,10 +425,15 @@ class Agent:
         self.profit = 0
         self.uuid = uuid
 
-
     def by(self, ticket, count, price, take_profit, stop_loss):
         """Реализация выставление тикета в стакан на покупку"""
-        client.insert_order(bot_id=self.uuid, ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
+        client.insert_order(
+            bot_id=self.uuid,
+            ticket=ticket,
+            count=count,
+            take_profit=take_profit,
+            stop_loss=stop_loss,
+        )
         # TODO insert в портфель
 
     # def sell(self, ticket_name, count):
@@ -411,10 +442,12 @@ class Agent:
 
     def do_nofing(self, tiket, date_time, last_price, take_profit, predict_news):
         """Не выставляем тикет и просто ждем, возвращаем действие ничего не делаем"""
-        print(f'Нет профита по {tiket} сейчас {date_time} цена = {last_price} меньше цены в будущем = {take_profit} плюс влияние новостей {predict_news}')
+        print(
+            f"Нет профита по {tiket} сейчас {date_time} цена = {last_price} меньше цены в будущем = {take_profit} плюс влияние новостей {predict_news}"
+        )
 
     def get_prices(self, stocks: list) -> list[tuple]:
-        """ Получить закупочную стоимость акций, которые необходимо купить
+        """Получить закупочную стоимость акций, которые необходимо купить
         Args:
             stocks: список акций, которые необходимо купить.
         Returns:
@@ -424,7 +457,7 @@ class Agent:
         return prices_list
 
     def get_ticket_price(self, ticket: str, df) -> tuple[int, Any]:
-        """ Получить закупочную стоимость конкретной акции
+        """Получить закупочную стоимость конкретной акции
         Args:
             ticket: название акции
         Returns:
@@ -435,16 +468,16 @@ class Agent:
 
         df = df.iloc[-shift:].head(1)
 
-        price = int(df['target'])
+        price = int(df["target"])
 
-        date_time = df['trade_datetime']
+        date_time = df["trade_datetime"]
 
-        print(f'target price = {price}')
+        print(f"target price = {price}")
 
         return price, date_time
 
     def get_TP_SL(self, df, last_price):
-        """ Получить значения для TakeProfit и StopLoss
+        """Получить значения для TakeProfit и StopLoss
         Args:
             :param last_price: последняя цена
             :param df: df цен на акцию
@@ -455,11 +488,11 @@ class Agent:
         # TODO вернуть функцию get_min_max_support для расчета уровней
         # max_support, min_support = get_min_max_support(df_price)
 
-        df = df[['segment'] == 'price'].reset_index(drop=True)
+        df = df[["segment"] == "price"].reset_index(drop=True)
 
         df = df.iloc[-HORIZON:]
 
-        max_predict = df['target'].max()
+        max_predict = df["target"].max()
 
         # Вверх максимум летим на predict + 2%
         take_profit = max_predict + ((max_predict * 2) / 100)
@@ -482,14 +515,20 @@ class Agent:
     #     #                 for ticket_info in prices_list]
     #     return max_price_for_one_bucket #stocks_count
 
-    def fill_stock_portfolio(self, portfel_tikets: list, portfel_last_price: list, portfel_stop_loss: list, portfel_take_profit: list) -> None:
-        """ Заполнить портфель равномерно акциями на максимальную сумму
-            :param portfel_take_profit:  list
-            :param portfel_stop_loss:  list
-            :param portfel_last_price: list
-            :param portfel_tikets: list
-            :param portfel_stop_loss: list
-            :param portfel_take_profit: list
+    def fill_stock_portfolio(
+        self,
+        portfel_tikets: list,
+        portfel_last_price: list,
+        portfel_stop_loss: list,
+        portfel_take_profit: list,
+    ) -> None:
+        """Заполнить портфель равномерно акциями на максимальную сумму
+        :param portfel_take_profit:  list
+        :param portfel_stop_loss:  list
+        :param portfel_last_price: list
+        :param portfel_tikets: list
+        :param portfel_stop_loss: list
+        :param portfel_take_profit: list
         """
         max_price_for_one_bucket = self.limit / len(portfel_last_price)
 
@@ -497,11 +536,16 @@ class Agent:
             if portfel_last_price[i] <= max_price_for_one_bucket:
                 ticket_count = max_price_for_one_bucket // portfel_last_price[i]
 
-                self.by(ticket=portfel_tikets[i], count=ticket_count, price=portfel_last_price[i], take_profit=portfel_take_profit[i], stop_loss=portfel_stop_loss[i])
-
+                self.by(
+                    ticket=portfel_tikets[i],
+                    count=ticket_count,
+                    price=portfel_last_price[i],
+                    take_profit=portfel_take_profit[i],
+                    stop_loss=portfel_stop_loss[i],
+                )
 
     def add_profit(self, profit: float) -> None:
-        """ Добавить профит за раунд
+        """Добавить профит за раунд
         Args:
             profit: названия акций для покупки
         Returns:
@@ -510,7 +554,7 @@ class Agent:
         self.profit += profit
 
     def add_limit(self, sum: float) -> None:
-        """ Добавить деньги за продажу
+        """Добавить деньги за продажу
         Args:
             profit: названия акций для покупки
         Returns:
@@ -519,28 +563,28 @@ class Agent:
         """
         self.limit += sum
 
-
     def close_day(self):
-        """ В конце дня закрываем все сделки в портфеле.
-        """
+        """В конце дня закрываем все сделки в портфеле."""
         stocks_in_profile = client.select_all_portfolio_stocks(bot_id=self.uuid)
         for stock in stocks_in_profile:
-           count, price = client.select_stock_count_and_price_in_portfolio(bot_id=self.uuid, ticket=stock)
-           client.sell_stock(bot_id=self.uuid, ticket=stock, count=count)
-           result = count * price
-           self.add_limit(result)
+            count, price = client.select_stock_count_and_price_in_portfolio(
+                bot_id=self.uuid, ticket=stock
+            )
+            client.sell_stock(bot_id=self.uuid, ticket=stock, count=count)
+            result = count * price
+            self.add_limit(result)
 
 
 def my_plot_forecast(
-        forecast_ts: Union["TSDataset", List["TSDataset"], Dict[str, "TSDataset"]],
-        test_ts: Optional["TSDataset"] = None,
-        train_ts: Optional["TSDataset"] = None,
-        segments: Optional[List[str]] = None,
-        n_train_samples: Optional[int] = None,
-        columns_num: int = 2,
-        figsize: Tuple[int, int] = (10, 5),
-        prediction_intervals: bool = False,
-        quantiles: Optional[List[float]] = None,
+    forecast_ts: Union["TSDataset", List["TSDataset"], Dict[str, "TSDataset"]],
+    test_ts: Optional["TSDataset"] = None,
+    train_ts: Optional["TSDataset"] = None,
+    segments: Optional[List[str]] = None,
+    n_train_samples: Optional[int] = None,
+    columns_num: int = 2,
+    figsize: Tuple[int, int] = (10, 5),
+    prediction_intervals: bool = False,
+    quantiles: Optional[List[float]] = None,
 ):
     """
     Plot of prediction for forecast pipeline.
@@ -588,7 +632,9 @@ def my_plot_forecast(
             unique_segments.update(forecast.segments)
         segments = list(unique_segments)
 
-    _, ax = _prepare_axes(num_plots=len(segments), columns_num=columns_num, figsize=figsize)
+    _, ax = _prepare_axes(
+        num_plots=len(segments), columns_num=columns_num, figsize=figsize
+    )
 
     if prediction_intervals:
         quantiles = _select_quantiles(forecast_results, quantiles)
@@ -619,14 +665,21 @@ def my_plot_forecast(
         if (train_ts is not None) and (n_train_samples != 0):
             ax[i].plot(plot_df.index.values, plot_df.target.values, label="train")
         if test_ts is not None:
-            ax[i].plot(segment_test_df.index.values, segment_test_df.target.values, color="purple", label="test")
+            ax[i].plot(
+                segment_test_df.index.values,
+                segment_test_df.target.values,
+                color="purple",
+                label="test",
+            )
 
         # plot forecast plot for each of given forecasts
         quantile_prefix = "target_"
         for forecast_name, forecast in forecast_results.items():
             legend_prefix = f"{forecast_name}: " if num_forecasts > 1 else ""
 
-            segment_forecast_df = forecast[:, segment, :][segment].sort_values(by="timestamp")
+            segment_forecast_df = forecast[:, segment, :][segment].sort_values(
+                by="timestamp"
+            )
             line = ax[i].plot(
                 segment_forecast_df.index.values,
                 segment_forecast_df.target.values,
@@ -642,8 +695,12 @@ def my_plot_forecast(
                     # define upper and lower border for this iteration
                     low_quantile = quantiles[quantile_idx]
                     high_quantile = quantiles[-quantile_idx - 1]
-                    values_low = segment_forecast_df[f"{quantile_prefix}{low_quantile}"].values
-                    values_high = segment_forecast_df[f"{quantile_prefix}{high_quantile}"].values
+                    values_low = segment_forecast_df[
+                        f"{quantile_prefix}{low_quantile}"
+                    ].values
+                    values_high = segment_forecast_df[
+                        f"{quantile_prefix}{high_quantile}"
+                    ].values
                     # if (low_quantile, high_quantile) is the smallest interval
                     if quantile_idx == len(quantiles) // 2 - 1:
                         ax[i].fill_between(
@@ -658,7 +715,9 @@ def my_plot_forecast(
                     else:
                         low_next_quantile = quantiles[quantile_idx + 1]
                         high_prev_quantile = quantiles[-quantile_idx - 2]
-                        values_next = segment_forecast_df[f"{quantile_prefix}{low_next_quantile}"].values
+                        values_next = segment_forecast_df[
+                            f"{quantile_prefix}{low_next_quantile}"
+                        ].values
                         ax[i].fill_between(
                             segment_forecast_df.index.values,
                             values_low,
@@ -667,7 +726,9 @@ def my_plot_forecast(
                             alpha=alpha[quantile_idx],
                             label=f"{legend_prefix}{low_quantile}-{high_quantile}",
                         )
-                        values_prev = segment_forecast_df[f"{quantile_prefix}{high_prev_quantile}"].values
+                        values_prev = segment_forecast_df[
+                            f"{quantile_prefix}{high_prev_quantile}"
+                        ].values
                         ax[i].fill_between(
                             segment_forecast_df.index.values,
                             values_high,
@@ -678,7 +739,9 @@ def my_plot_forecast(
                 # when we can't find pair quantile, we plot it separately
                 if len(quantiles) % 2 != 0:
                     remaining_quantile = quantiles[len(quantiles) // 2]
-                    values = segment_forecast_df[f"{quantile_prefix}{remaining_quantile}"].values
+                    values = segment_forecast_df[
+                        f"{quantile_prefix}{remaining_quantile}"
+                    ].values
                     ax[i].plot(
                         segment_forecast_df.index.values,
                         values,
@@ -690,41 +753,41 @@ def my_plot_forecast(
         ax[i].tick_params("x", rotation=45)
         ax[i].legend(loc="upper left")
 
-        _.savefig(f'png_traiding/{segment}.png')  # save the figure to file
+        _.savefig(f"png_traiding/{segment}.png")  # save the figure to file
         plt.close(_)
 
 
 def my_plot(
-        df,
-        n_segments: int = 10,
-        column: str = "target",
-        segments: Optional[Sequence[str]] = None,
-        start: Optional[str] = None,
-        end: Optional[str] = None,
-        seed: int = 1,
-        figsize: Tuple[int, int] = (15, 7),
+    df,
+    n_segments: int = 10,
+    column: str = "target",
+    segments: Optional[Sequence[str]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    seed: int = 1,
+    figsize: Tuple[int, int] = (15, 7),
 ):
     """Plot of random or chosen segments.
 
-        Parameters
-        ----------
-        n_segments:
-            number of random segments to plot
-        column:
-            feature to plot
-        segments:
-            segments to plot
-        seed:
-            seed for local random state
-        start:
-            start plot from this timestamp
-        end:
-            end plot at this timestamp
-        figsize:
-            size of the figure per subplot with one segment in inches
-        """
+    Parameters
+    ----------
+    n_segments:
+        number of random segments to plot
+    column:
+        feature to plot
+    segments:
+        segments to plot
+    seed:
+        seed for local random state
+    start:
+        start plot from this timestamp
+    end:
+        end plot at this timestamp
+    figsize:
+        size of the figure per subplot with one segment in inches
+    """
     if segments is None:
-        segments = df['segment'].unique().tolist()
+        segments = df["segment"].unique().tolist()
         k = min(n_segments, len(segments))
     else:
         k = len(segments)
@@ -738,23 +801,25 @@ def my_plot(
     _, ax = plt.subplots(rows_num, columns_num, figsize=figsize, squeeze=False)
     ax = ax.ravel()
     rnd_state = np.random.RandomState(seed)
-    for i, segment in enumerate(sorted(rnd_state.choice(segments, size=k, replace=False))):
+    for i, segment in enumerate(
+        sorted(rnd_state.choice(segments, size=k, replace=False))
+    ):
         df_slice = df[start:end, segment, column]  # type: ignore
         ax[i].plot(df_slice.index, df_slice.values)
         ax[i].set_title(segment)
         ax[i].grid()
 
-    _.savefig(f'png_traiding/plot_{segment}.png')  # save the figure to file
+    _.savefig(f"png_traiding/plot_{segment}.png")  # save the figure to file
     plt.close(_)
 
 
 def my_plot_backtest(
-        forecast_df: pd.DataFrame,
-        ts: "TSDataset",
-        segments: Optional[List[str]] = None,
-        columns_num: int = 2,
-        history_len: Union[int, Literal["all"]] = 0,
-        figsize: Tuple[int, int] = (10, 5),
+    forecast_df: pd.DataFrame,
+    ts: "TSDataset",
+    segments: Optional[List[str]] = None,
+    columns_num: int = 2,
+    history_len: Union[int, Literal["all"]] = 0,
+    figsize: Tuple[int, int] = (10, 5),
 ):
     """Plot targets and forecast for backtest pipeline.
 
@@ -801,9 +866,13 @@ def my_plot_backtest(
     # prepare colors
     default_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     color_cycle = itertools.cycle(default_colors)
-    lines_colors = {line_name: next(color_cycle) for line_name in ["history", "test", "forecast"]}
+    lines_colors = {
+        line_name: next(color_cycle) for line_name in ["history", "test", "forecast"]
+    }
 
-    _, ax = _prepare_axes(num_plots=len(segments), columns_num=columns_num, figsize=figsize)
+    _, ax = _prepare_axes(
+        num_plots=len(segments), columns_num=columns_num, figsize=figsize
+    )
     for i, segment in enumerate(segments):
         segment_backtest_df = backtest_df[segment]
         segment_history_df = history_df[segment]
@@ -816,7 +885,9 @@ def my_plot_backtest(
         if history_len == "all":
             plot_df = pd.concat((segment_history_df, segment_backtest_df))
         elif history_len > 0:
-            plot_df = pd.concat((segment_history_df.tail(history_len), segment_backtest_df))
+            plot_df = pd.concat(
+                (segment_history_df.tail(history_len), segment_backtest_df)
+            )
         else:
             plot_df = segment_backtest_df
         ax[i].plot(plot_df.index, plot_df.target, color=lines_colors["history"])
@@ -824,26 +895,46 @@ def my_plot_backtest(
         for fold_number in folds:
             start_fold = fold_numbers[fold_numbers == fold_number].index.min()
             end_fold = fold_numbers[fold_numbers == fold_number].index.max()
-            end_fold_exclusive = pd.date_range(start=end_fold, periods=2, freq=ts.freq)[1]
+            end_fold_exclusive = pd.date_range(start=end_fold, periods=2, freq=ts.freq)[
+                1
+            ]
 
             # draw test
             backtest_df_slice_fold = segment_backtest_df[start_fold:end_fold_exclusive]
-            ax[i].plot(backtest_df_slice_fold.index, backtest_df_slice_fold.target, color=lines_colors["test"])
+            ax[i].plot(
+                backtest_df_slice_fold.index,
+                backtest_df_slice_fold.target,
+                color=lines_colors["test"],
+            )
 
             if draw_only_lines:
                 # draw forecast
-                forecast_df_slice_fold = segment_forecast_df[start_fold:end_fold_exclusive]
-                ax[i].plot(forecast_df_slice_fold.index, forecast_df_slice_fold.target, color=lines_colors["forecast"])
+                forecast_df_slice_fold = segment_forecast_df[
+                    start_fold:end_fold_exclusive
+                ]
+                ax[i].plot(
+                    forecast_df_slice_fold.index,
+                    forecast_df_slice_fold.target,
+                    color=lines_colors["forecast"],
+                )
             else:
                 forecast_df_slice_fold = segment_forecast_df[start_fold:end_fold]
-                backtest_df_slice_fold = backtest_df_slice_fold.loc[forecast_df_slice_fold.index]
+                backtest_df_slice_fold = backtest_df_slice_fold.loc[
+                    forecast_df_slice_fold.index
+                ]
 
                 # draw points on test
-                ax[i].scatter(backtest_df_slice_fold.index, backtest_df_slice_fold.target, color=lines_colors["test"])
+                ax[i].scatter(
+                    backtest_df_slice_fold.index,
+                    backtest_df_slice_fold.target,
+                    color=lines_colors["test"],
+                )
 
                 # draw forecast
                 ax[i].scatter(
-                    forecast_df_slice_fold.index, forecast_df_slice_fold.target, color=lines_colors["forecast"]
+                    forecast_df_slice_fold.index,
+                    forecast_df_slice_fold.target,
+                    color=lines_colors["forecast"],
                 )
 
             # draw borders of current fold
@@ -857,12 +948,13 @@ def my_plot_backtest(
 
         # plot legend
         legend_handles = [
-            Line2D([0], [0], marker="o", color=color, label=label) for label, color in lines_colors.items()
+            Line2D([0], [0], marker="o", color=color, label=label)
+            for label, color in lines_colors.items()
         ]
         ax[i].legend(handles=legend_handles)
 
         ax[i].set_title(segment)
         ax[i].tick_params("x", rotation=45)
 
-    _.savefig(f'png_traiding/plot_backtest_{segment}.png')  # save the figure to file
+    _.savefig(f"png_traiding/plot_backtest_{segment}.png")  # save the figure to file
     plt.close(_)
