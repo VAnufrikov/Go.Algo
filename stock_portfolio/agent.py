@@ -475,7 +475,7 @@ class Agent:
 
         price = int(df_new["target"])
 
-        date_time = str(df_new["trade_datetime"].values(0))
+        date_time = str(df_new["trade_datetime"].values[0])
 
         print(f"target price = {price}")
 
