@@ -151,9 +151,9 @@ def run_agent(horizon, uuid):
 
             df_price = inside[inside["segment"] == "price"].reset_index(drop=True)
 
-            print(df_price.head())
-
-            print(df_price.info())
+            # print(df_price.head())
+            #
+            # print(df_price.info())
 
             last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
@@ -415,7 +415,7 @@ def predict(trade, order, obs, horizon):
             drop=True
         )
 
-    print(predict.info())
+    # print(predict.info())
 
     return predict
 
@@ -471,13 +471,10 @@ class Agent:
         shift = HORIZON + 1
 
         df_new = df.iloc[-shift:].head(1)
-        print(df_new.head())
-
-        print(df_new.info())
 
         price = int(df_new["target"])
 
-        date_time = str(df_new["trade_datetime"])
+        date_time = str(df_new["trade_datetime"].values(0))
 
         print(f"target price = {price}")
 
