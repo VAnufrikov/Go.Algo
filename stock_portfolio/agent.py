@@ -129,7 +129,7 @@ def run_agent(horizon, uuid):
     выход решение о покупке или продаже"""
     agent = Agent(uuid)
     NR = NewsRegressor()
-    client = SQLiteClient()
+    client = SQLiteClient(Config.SQL_DATABASE_PATH)
     """
     Тут мы должны получать по каждому тикету 
     предикт на стоимость портфеля и далее анализировать какую часть портфеля
