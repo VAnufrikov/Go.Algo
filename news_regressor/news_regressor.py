@@ -21,7 +21,8 @@ class NewsRegressor:
         и по истории новостей до текущего времени определяем влияние на тикеты
         """
         df = self.df
-        result = 1.0
+
+        result = 0
         timestamp = datetime.datetime.strptime(str(date)[:19], "%Y-%m-%dT%H:%M:%S")
         all_news = df[df["date"] < timestamp]
         ticket_news = df[
@@ -35,4 +36,4 @@ class NewsRegressor:
             regressor.fit(vectors, all_news["proc"])
             predict = regressor.predict(self.vectorizer.encode(ticket_news))
             result = round(sum(predict) / len(predict), 3)
-        return result
+        return result + 1

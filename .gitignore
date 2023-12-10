@@ -3,3 +3,6 @@ tradestats_CBOM.csv
 /moexalgo
 /data
 /SmartLabAPI-heroku
+/data_moex.ipynb
+/data_moex_1.ipynb
+/stock_portfolio/stock_portfolio.db
