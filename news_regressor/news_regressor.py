@@ -21,6 +21,7 @@ class NewsRegressor:
         и по истории новостей до текущего времени определяем влияние на тикеты
         """
         df = self.df
+
         result = 0
         timestamp = datetime.datetime.strptime(str(date)[:19], "%Y-%m-%dT%H:%M:%S")
         all_news = df[df["date"] < timestamp]

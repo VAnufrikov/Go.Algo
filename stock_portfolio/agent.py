@@ -50,8 +50,10 @@ ALL_PREDICT_DATA_FROM_ETNA = pd.DataFrame(
 def get_tiket():
     """Получаем тикеты для фокусирования бота"""
     listing = read_data_stock(Config.SRCH_MOEX)
-
-    ranking_listing = ranking(listing)
+    tikets = listing[(listing['INSTRUMENT_TYPE'] == 'Акция обыкновенная') |
+                    (listing['INSTRUMENT_TYPE'] == 'Акции иностранного эмитента')]['TRADE_CODE'].unique()
+    print(f"Ранжируем {len(tikets)} акций")
+    ranking_listing = ranking(tikets)
     return ranking_listing
 
 
