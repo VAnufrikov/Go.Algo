@@ -52,6 +52,7 @@ class SQLiteClient:
         return self.execute(insert_query)
 
     def sell_stock(self, ticket, count):
+        """Удаляем из портфеля и текущую цену удаляем сколько продаем"""
         current_count, current_price = self.select_stock_count_and_price_in_portfolio(ticket=ticket)
         profit = current_price * count
         new_count = current_count - count
