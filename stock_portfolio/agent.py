@@ -1,6 +1,8 @@
 import itertools
 from uuid import uuid4
 
+from news_regressor import NewsRegressor
+
 import etna
 import random
 
@@ -25,13 +27,12 @@ from etna.transforms import DensityOutliersTransform, TimeSeriesImputerTransform
     LagTransform, DateFlagsTransform, FourierTransform, SegmentEncoderTransform, MeanTransform, HolidayTransform
 from etna.metrics import SMAPE, MAE, MSE, smape
 
-from stock_portfolio.portfolio import get_tiket
 from upload_data.upload import upload_data_from_moexalgo
 import numpy as np
 from etna.analysis.utils import _prepare_axes
 from etna.analysis.forecast.utils import _prepare_forecast_results, _select_quantiles, _validate_intersecting_segments
 
-from typing import Dict, Sequence, Literal
+from typing import Dict, Sequence, Literal, Tuple, Any
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -41,6 +42,18 @@ import matplotlib.pyplot as plt
 import warnings
 
 warnings.filterwarnings("ignore")
+
+from settings import Config
+from upload_data.Ranking import ranking
+from upload_data.upload import read_data_stock
+
+
+def get_tiket():
+    listing = read_data_stock(Config.SRCH_MOEX)
+
+    ranking_listing = ranking(listing)
+    """Получаем рандомный тикет для фокусирования бота"""
+    return ranking_listing
 
 
 def make_indicators(df: pd.DataFrame):
@@ -53,7 +66,6 @@ def make_indicators(df: pd.DataFrame):
     pr_high = df[['segment'] == 'pr_high'].reset_index(drop=True)
     pr_low = df[['segment'] == 'pr_low'].reset_index(drop=True)
     df = df[['segment'] == 'price'].reset_index(drop=True)
-
 
     ema = df['target'].ewm(span=50, adjust=False).mean()
 
@@ -84,16 +96,11 @@ def make_indicators(df: pd.DataFrame):
 
     df['14-baket-WILLIAMS'] = williams
 
+    # TODO Relative Strength Index
+    # TODO Average Directional Index
+    # TODO Standard Deviation
+
     return df
-
-
-#
-# Double EMA
-# Triple EMA
-# Williams
-# Relative Strength Index
-# Average Directional Index
-# Standard Deviation
 
 
 def get_min_max_support(df):
@@ -116,40 +123,43 @@ def run_agent():
     """Входом будет получение датасета за прошлые даты,
                 выход решение о покупке или продаже """
     agent = Agent()
+    NR = NewsRegressor()
     """
     Тут мы должны получать по каждому тикету 
     предикт на стоимость портфеля и далее анализировать какую часть портфеля
     мы можем купить по всем позициям
     """
-    tiket = get_tiket()
 
-    tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
+    # Пока не пройдемся по всем тикетам из листа тикетов
+    for tiket in get_tiket():
+        tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
 
-    inside = predict(tradestats, orderstats, obstats)
+        inside = predict(tradestats, orderstats, obstats)
 
-    df_price = inside[['segment'] == 'price'].reset_index(drop=True)
+        df_price = inside[['segment'] == 'price'].reset_index(drop=True)
 
-    last_price = agent.get_ticket_price(tiket, df_price)
+        last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
-    take_profit, stop_loss = agent.get_TP_SL(inside, last_price)
+        take_profit, stop_loss = agent.get_TP_SL(inside, last_price)
 
+        predict_news = NR.predict(ticket=tiket, date=date_time)
 
-    # # Решить мы будем покупать или продавать или ничего не делать
-    #
-    # # by
-    # insert_order()
-    # insert_stock()
-    #
-    # # sell
-    # insert_order()
-    # sell_stock()
+        # # Решить мы будем покупать или продавать или ничего не делать
+        #
+        # # by
+        # insert_order()
+        # insert_stock()
+        #
+        # # sell
+        # insert_order()
+        # sell_stock()
 
-    if inside == 1:
-        agent.by()
-    elif inside == -1:
-        agent.sell()
-    else:
-        agent.do_nofing()
+        if inside == 1:
+            agent.by()
+        elif inside == -1:
+            agent.sell()
+        else:
+            agent.do_nofing()
 
 
 def etna_predict(param, segment):
@@ -378,7 +388,6 @@ class Agent:
         client.insert_order(bot_id=self.uuid, ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
         # TODO insert в портфель
 
-
     def sell(self, ticket_name, count):
         """Реализация выставление тикета в стакан на продажу"""
         # insert_order
@@ -399,7 +408,7 @@ class Agent:
         prices_list = [(ticket, self.get_ticket_price(ticket)) for ticket in stocks]
         return prices_list
 
-    def get_ticket_price(self, ticket: str, df) -> int:
+    def get_ticket_price(self, ticket: str, df) -> tuple[int, Any]:
         """ Получить закупочную стоимость конкретной акции
         Args:
             ticket: название акции
@@ -414,13 +423,16 @@ class Agent:
 
         price = int(df['target'])
 
+        date_time = df['trade_datetime']
+
         print(f'target price = {price}')
 
-        return price
+        return price, date_time
 
     def get_TP_SL(self, df, last_price):
         """ Получить значения для TakeProfit и StopLoss
         Args:
+            :param last_price: последняя цена
             :param df: df цен на акцию
         Returns:
             take_profit: значение тейк профит
