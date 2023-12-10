@@ -1,7 +1,7 @@
 import itertools
 from uuid import uuid4
 
-from news_regressor import NewsRegressor
+from news_regressor.news_regressor import NewsRegressor
 
 import etna
 import random
@@ -50,10 +50,10 @@ ALL_PREDICT_DATA_FROM_ETNA = pd.DataFrame(columns=['timestamp', 'segment', 'targ
 
 
 def get_tiket():
+    """Получаем тикеты для фокусирования бота"""
     listing = read_data_stock(Config.SRCH_MOEX)
 
     ranking_listing = ranking(listing)
-    """Получаем рандомный тикет для фокусирования бота"""
     return ranking_listing
 
 
@@ -428,9 +428,8 @@ class Agent:
         Args:
             ticket: название акции
         Returns:
-            price: цена акции
             :param ticket: Тикет по которому хотим узнать цену
-            :param df: DataFrame - с ценой акции
+            :param df: DataFrame - с ценой акции (формуруется в момент )
         """
         shift = HORIZON + 1
 

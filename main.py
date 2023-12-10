@@ -6,13 +6,13 @@ import os
 
 if __name__ == '__main__':
     """Запускаем бота и устанавливаем нужную библиотеку etna"""
-    # os.system("pip install --upgrade pip'")
-    # os.system("pip install 'etna[torch]'")
-    # os.system("pip install 'etna[auto]'")
-    # os.system("pip install 'etna[statsforecast]'")
-    # os.system("pip install 'etna[classification]'")
-    # os.system("pip install 'etna[prophet]'")
-    # os.system("pip install 'etna[all]'")
+    os.system("pip install --upgrade pip'")
+    os.system("pip install 'etna[torch]'")
+    os.system("pip install 'etna[auto]'")
+    os.system("pip install 'etna[statsforecast]'")
+    os.system("pip install 'etna[classification]'")
+    os.system("pip install 'etna[prophet]'")
+    os.system("pip install 'etna[all]'")
     
     agent_id = str(uuid4())
     while HORIZON > 1:
