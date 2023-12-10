@@ -15,3 +15,7 @@ python3 -m isort stock_portfolio/*.py
 python3 -m isort upload_data/*.py
 python3 -m isort settings.py
 python3 -m isort main.py
+
+python3 -m pip3 install --upgrade pip
+python3 -m pip3 install requirements.txt
+python3 -m main.py
