@@ -15,20 +15,19 @@ class NewsRegressor():
         return self.vectorizer.encode(text)
 
     def predict(self, date, ticket):
-        """ по текущему времени и названию тикета получаем доступные новости 
-            и по истории новостей до текущего времени определеяем влияние на тикеты
+        """ По текущему времени и названию тикета получаем доступные новости
+            и по истории новостей до текущего времени определяем влияние на тикеты
         """
         df = self.df
         result = 1.0
         timestamp = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
-        all_news = df[df['date']<timestamp]
-        ticket_news = df[ (df['ticket'] == ticket) & (df['date']<timestamp+td(hours=3)) & (df['date']>timestamp-td(minutes=15)) ]['news'].unique()
-        if len(all_news)>0 and len(ticket_news) > 0:
+        all_news = df[df['date'] < timestamp]
+        ticket_news = df[(df['ticket'] == ticket) & (df['date'] < timestamp + td(hours=3)) & (
+                    df['date'] > timestamp - td(minutes=15))]['news'].unique()
+        if len(all_news) > 0 and len(ticket_news) > 0:
             regressor = KNeighborsRegressor()
             vectors = self.vectorizer.encode(all_news['news'].values.tolist())
             regressor.fit(vectors, all_news['proc'])
             predict = regressor.predict(self.vectorizer.encode(ticket_news))
-            result = round(sum(predict)/len(predict), 3)
+            result = round(sum(predict) / len(predict), 3)
         return result
-
-

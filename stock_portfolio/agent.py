@@ -3,7 +3,6 @@ from uuid import uuid4
 
 from news_regressor import NewsRegressor
 
-
 import etna
 import random
 
@@ -46,6 +45,8 @@ warnings.filterwarnings("ignore")
 
 from upload_data.Ranking import ranking
 from upload_data.upload import read_data_stock
+
+ALL_PREDICT_DATA_FROM_ETNA = pd.DataFrame(columns=['timestamp', 'segment', 'target', 'trade_datetime'])
 
 
 def get_tiket():
@@ -132,10 +133,15 @@ def run_agent(horizon, uuid):
 
     if LIMIT != 0:
         # Пока не пройдемся по всем тикетам из листа тикетов
+        portfel_tikets = []
+        portfel_last_price = []
+        portfel_stop_loss = []
+        portfel_take_profit = []
+
         for tiket in get_tiket():
             tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
 
-            inside = predict(tradestats, orderstats, obstats)
+            inside = predict(tradestats, orderstats, obstats, HORIZON)
 
             df_price = inside[['segment'] == 'price'].reset_index(drop=True)
 
@@ -145,23 +151,21 @@ def run_agent(horizon, uuid):
 
             predict_news = NR.predict(ticket=tiket, date=date_time)
 
-            # # Решить мы будем покупать или продавать или ничего не делать
-            #
-            # # by
-            # insert_order()
-            # insert_stock()
-            #
-            # # sell
-            # insert_order()
-            # sell_stock()
+            # last_price - цена покупки
+            # date_time - дата и время покупки
+            # take_profit - прогноз цены продажи с прибылью
+            # stop_loss - прогноз цены продажи остановить убытки
+            # predict_news - как повлияют цены на акцию в момент покупки и продажи?
 
-            # if inside == 1:
-            #     agent.by()
-            #
-            # elif inside == -1:
-            #     agent.sell()
-            # else:
-            #     agent.do_nofing()
+            if last_price < take_profit:
+                portfel_tikets.append(tiket)
+                portfel_last_price.append(last_price)
+                portfel_stop_loss.append(stop_loss)
+                portfel_take_profit.append(take_profit)
+            else:
+                agent.do_nofing(tiket, date_time, last_price, take_profit, predict_news)
+
+        agent.fill_stock_portfolio(portfel_tikets, portfel_last_price, portfel_stop_loss, portfel_take_profit)
 
     new_horizon = HORIZON - 1
     if new_horizon == 1:
@@ -224,6 +228,7 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
     #     my_plot_backtest(forecast_df, ts)
     #     print(metrics_df.head(100))
 
+    # TODO Исправить метрики !!!!!!
     print(f'{segment} SMAPE = {SMAPE(y_true=test_ts, y_pred=forecast_ts)}')
     print(f'{segment} MAE = {MAE(y_true=test_ts, y_pred=forecast_ts)}')
     print(f'{segment} MSE = {MSE(y_true=test_ts, y_pred=forecast_ts)}')
@@ -384,6 +389,7 @@ def predict(trade, order, obs, horizon):
     return predict
 
 
+
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
@@ -394,21 +400,18 @@ class Agent:
         self.uuid = uuid
 
 
-    def by(self, ticket, count, price):
+    def by(self, ticket, count, price, take_profit, stop_loss):
         """Реализация выставление тикета в стакан на покупку"""
-        take_profit, stop_loss = self.get_TP_SL(ticket)
         client.insert_order(bot_id=self.uuid, ticket=ticket, count=count, take_profit=take_profit, stop_loss=stop_loss)
         # TODO insert в портфель
 
-    def sell(self, ticket_name, count):
-        """Реализация выставление тикета в стакан на продажу"""
-        # insert_order
-        # TODO sell_stock в портфель
-        pass
+    # def sell(self, ticket_name, count):
+    #     """Реализация выставление тикета в стакан на продажу в шорт (пока не делали)"""
+    #     pass
 
-    def do_nofing(self):
+    def do_nofing(self, tiket, date_time, last_price, take_profit, predict_news):
         """Не выставляем тикет и просто ждем, возвращаем действие ничего не делаем"""
-        pass
+        print(f'Нет профита по {tiket} сейчас {date_time} цена = {last_price} меньше цены в будущем = {take_profit} плюс влияние новостей {predict_news}')
 
     def get_prices(self, stocks: list) -> list[tuple]:
         """ Получить закупочную стоимость акций, которые необходимо купить
@@ -450,50 +453,59 @@ class Agent:
             take_profit: значение тейк профит
             stop_loss: значение стоплос
         """
-        # TODO венуть функцию get_min_max_support для расчета уровней
+        # TODO вернуть функцию get_min_max_support для расчета уровней
         # max_support, min_support = get_min_max_support(df_price)
 
         df = df[['segment'] == 'price'].reset_index(drop=True)
 
-        df = df.iloc[-Config.HORIZON:]
+        df = df.iloc[-HORIZON:]
 
         max_predict = df['target'].max()
 
         # Вверх максимум летим на predict + 2%
-        take_profit = df['target'].max() + max_predict - ((max_predict * 2) / 100)
+        take_profit = max_predict + ((max_predict * 2) / 100)
 
         # Вниз максимум летим на -10 %
         stop_loss = last_price - ((last_price * 10) / 100)
 
         return take_profit, stop_loss
 
-    def count_stocks_values(self, prices_list: list, limit: int) -> list[tuple]:
-        """ Посчитать соотношение акций к покупке
-        Args:
-            prices_list: список акций с ценами
-            limit: максимальная сумма стоимости акций
-        Returns:
-            stocks_count: [("ticket", "count")] - количество акций к покупке
-        """
-        max_price_for_one_bucket = limit / len(prices_list)
-        stocks_count = [(ticket_info[0], max_price_for_one_bucket // ticket_info[1])
-                        for ticket_info in prices_list]
-        return stocks_count
+    # def count_stocks_values(self, prices_list: list, limit: int) -> list[tuple]:
+    #     """ Посчитать соотношение акций к покупке
+    #     Args:
+    #         prices_list: список акций с ценами
+    #         limit: максимальная сумма стоимости акций
+    #     Returns:
+    #         stocks_count: [("ticket", "count")] - количество акций к покупке
+    #     """
+    #     max_price_for_one_bucket = limit / len(prices_list)
+    #     # stocks_count = [(ticket_info[0], max_price_for_one_bucket // ticket_info[1])
+    #     #                 for ticket_info in prices_list]
+    #     return max_price_for_one_bucket #stocks_count
 
-    def fill_stock_portfolio(self, stocks: list, limit: int) -> None:
+    def fill_stock_portfolio(self, portfel_tikets: list, portfel_last_price: list, portfel_stop_loss: list, portfel_take_profit: list) -> None:
         """ Заполнить портфель равномерно акциями на максимальную сумму
-        Args:
-            stocks: названия акций для покупки
-            limit: максимальная сумма стоимости акций
-        Returns:
-            None
+            :param portfel_take_profit:  list
+            :param portfel_stop_loss:  list
+            :param portfel_last_price: list
+            :param portfel_tikets: list
+            :param portfel_stop_loss: list
+            :param portfel_take_profit: list
         """
-        prices_list = self.get_prices(stocks)
-        stocks_count = self.count_stocks_values(prices_list, limit)
-        for stock_info in stocks_count:
-            ticket_name = stock_info[0]
-            ticket_count = stock_info[1]
-            self.by(ticket=ticket_name, count=ticket_count, price=stock_info[1])
+        max_price_for_one_bucket = self.limit / len(portfel_last_price)
+        # self.count_stocks_values(portfel_last_price, self.limit)
+
+        for i in range(len(portfel_tikets)):
+            if portfel_last_price[i] <= max_price_for_one_bucket:
+                self.by(ticket=portfel_tikets[i], count=ticket_count, price=stock_info[1], take_profit, stop_loss)
+
+
+        # prices_list = portfel_tikets
+        # stocks_count = self.count_stocks_values(portfel_last_price, self.limit)
+        # for stock_info in stocks_count:
+        #     ticket_name = stock_info[0]
+        #     ticket_count = stock_info[1]
+        #     self.by(ticket=ticket_name, count=ticket_count, price=stock_info[1], take_profit, stop_loss)
 
     def add_profit(self, profit: float) -> None:
         """ Добавить профит за раунд
@@ -510,12 +522,13 @@ class Agent:
             profit: названия акций для покупки
         Returns:
             None
+            :param sum:
         """
         self.limit += sum
 
 
     def close_day(self):
-        """ в конце дня закрываем все сделки в портфеле.
+        """ В конце дня закрываем все сделки в портфеле.
         """
         stocks_in_profile = client.select_all_portfolio_stocks(bot_id=self.uuid)
         for stock in stocks_in_profile:
