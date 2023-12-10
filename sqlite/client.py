@@ -53,6 +53,7 @@ class SQLiteClient:
             VALUES ('{bot_id}', '{ticket}', {count}, {new_mean_price});"""
         return self.execute(insert_query)
 
+
     def sell_stock(self, bot_id, ticket, count):
         current_count, current_price = self.select_stock_count_and_price_in_portfolio(bot_id=bot_id, ticket=ticket)
         profit = current_price * count
@@ -69,6 +70,7 @@ class SQLiteClient:
         return self.execute(select_all_query)
 
     def select_all_portfolio_stocks(self, bot_id):
+
         select_all_query= """SELECT * from stock_portfolio WHERE bot_id=="{bot_id}" """
         return self.execute(select_all_query)
 

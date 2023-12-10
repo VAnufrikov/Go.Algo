@@ -1,24 +1,13 @@
-from datetime import datetime
+from datetime import date
 
-import pandas as pd
-from etna.datasets import TSDataset
+DATE_START = date(2023, 10, 1)
+DATE_END = date(2023, 10, 2)
 
-from moexalgo import Ticker
-from settings import DATE_START, DATE_END
+from upload_data.upload import upload_data_from_moexalgo
 
-tiket = Ticker('ALRS')
-tradestats = pd.DataFrame(tiket.tradestats(date=DATE_START, till_date=DATE_END))
+tradestats, orderstats, obstats = upload_data_from_moexalgo('AFKS',DATE_START,DATE_END)
 
 
-tradestats['fake_datetime'] = pd.to_datetime(tradestats['ts'],format='%Y-%m-%d %H:%M')
-
-tradestats.rename(columns={'secid': 'ticker'}, inplace=True)
-# print(tradestats.info ())
-
-df = tradestats[['fake_datetime','ticker','pr_close']].reset_index(drop=True)
-
-df.columns = ['timestamp','segment','target']
-
-etna_df = TSDataset.to_dataset(df)
-
-print(etna_df.info())
+print(tradestats.info())
+print(orderstats.info())
+print(obstats.info())
