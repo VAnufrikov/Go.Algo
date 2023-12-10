@@ -130,37 +130,38 @@ def run_agent(horizon, uuid):
     мы можем купить по всем позициям
     """
 
-    # Пока не пройдемся по всем тикетам из листа тикетов
-    for tiket in get_tiket():
-        tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
+    if LIMIT != 0:
+        # Пока не пройдемся по всем тикетам из листа тикетов
+        for tiket in get_tiket():
+            tradestats, orderstats, obstats = upload_data_from_moexalgo(tiket, DATE_START, DATE_END)
 
-        inside = predict(tradestats, orderstats, obstats)
+            inside = predict(tradestats, orderstats, obstats)
 
-        df_price = inside[['segment'] == 'price'].reset_index(drop=True)
+            df_price = inside[['segment'] == 'price'].reset_index(drop=True)
 
-        last_price, date_time = agent.get_ticket_price(tiket, df_price)
+            last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
-        take_profit, stop_loss = agent.get_TP_SL(inside, last_price)
+            take_profit, stop_loss = agent.get_TP_SL(inside, last_price)
 
-        predict_news = NR.predict(ticket=tiket, date=date_time)
+            predict_news = NR.predict(ticket=tiket, date=date_time)
 
-        # # Решить мы будем покупать или продавать или ничего не делать
-        #
-        # # by
-        # insert_order()
-        # insert_stock()
-        #
-        # # sell
-        # insert_order()
-        # sell_stock()
+            # # Решить мы будем покупать или продавать или ничего не делать
+            #
+            # # by
+            # insert_order()
+            # insert_stock()
+            #
+            # # sell
+            # insert_order()
+            # sell_stock()
 
-        if inside == 1:
-            agent.by()
-
-        elif inside == -1:
-            agent.sell()
-        else:
-            agent.do_nofing()
+            # if inside == 1:
+            #     agent.by()
+            #
+            # elif inside == -1:
+            #     agent.sell()
+            # else:
+            #     agent.do_nofing()
 
     new_horizon = HORIZON - 1
     if new_horizon == 1:
