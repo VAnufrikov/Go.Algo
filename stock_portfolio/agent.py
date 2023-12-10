@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from news_regressor import NewsRegressor
 
+
 import etna
 import random
 
@@ -119,11 +120,11 @@ def get_min_max_support(df):
     return max_support, min_support
 
 
-def run_agent():
-    """Входом будет получение датасета за прошлые даты,
-                выход решение о покупке или продаже """
-    agent = Agent()
-    NR = NewsRegressor()
+def run_agent(horizon, uuid):
+        """Входом будет получение датасета за прошлые даты,
+                    выход решение о покупке или продаже """
+        agent = Agent(uuid)
+        NR = NewsRegressor()
     """
     Тут мы должны получать по каждому тикету 
     предикт на стоимость портфеля и далее анализировать какую часть портфеля
@@ -156,29 +157,37 @@ def run_agent():
 
         if inside == 1:
             agent.by()
+            
         elif inside == -1:
             agent.sell()
         else:
             agent.do_nofing()
+            
+        new_horizon = horizon - 1
+        if new_horizon == 1:
+            agent.close_day()
+        
+        return new_horizon
 
 
-def etna_predict(param, segment):
+
+def etna_predict(param, segment, horizon):
     """Предсказываем наши временные ряды по 3м сегментам"""
     ts = TSDataset(param, freq="T")
 
-    train_ts, test_ts = ts.train_test_split(test_size=Config.HORIZON)
+    train_ts, test_ts = ts.train_test_split(test_size=horizon)
 
     transforms = [
         DensityOutliersTransform(in_column="target", distance_coef=3.0),
         TimeSeriesImputerTransform(in_column="target", strategy="forward_fill"),
         LinearTrendTransform(in_column="target"),
         TrendTransform(in_column="target", out_column="trend"),
-        LagTransform(in_column="target", lags=list(range(Config.HORIZON, 122)), out_column="target_lag"),
+        LagTransform(in_column="target", lags=list(range(horizon, 122)), out_column="target_lag"),
         DateFlagsTransform(week_number_in_month=True, out_column="date_flag"),
         FourierTransform(period=360.25, order=6, out_column="fourier"),
         SegmentEncoderTransform(),
-        MeanTransform(in_column=f"target_lag_{Config.HORIZON}", window=12, seasonality=7),
-        MeanTransform(in_column=f"target_lag_{Config.HORIZON}", window=7),
+        MeanTransform(in_column=f"target_lag_{horizon}", window=12, seasonality=7),
+        MeanTransform(in_column=f"target_lag_{horizon}", window=7),
         DateFlagsTransform(out_column="date_flags",
                            day_number_in_week=True,
                            day_number_in_month=True,
@@ -188,7 +197,7 @@ def etna_predict(param, segment):
         HolidayTransform(out_column="holiday", iso_code="RU"),
     ]
 
-    pipeline, forecast_ts = etna_train(transforms, Config.HORIZON, train_ts)
+    pipeline, forecast_ts = etna_train(transforms, horizon, train_ts)
 
     # Сохраняем картинки
     save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment)
@@ -220,12 +229,12 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
     print(f'{segment} MSE = {MSE(y_true=test_ts, y_pred=forecast_ts)}')
 
 
-def etna_train(transforms, HORIZON, train_ts):
+def etna_train(transforms, horizon, train_ts):
     """Производим обучение модели по подготовленым данным"""
 
     model = CatBoostMultiSegmentModel()
 
-    pipeline = Pipeline(model=model, transforms=transforms, horizon=HORIZON)
+    pipeline = Pipeline(model=model, transforms=transforms, horizon=horizon)
 
     pipeline.fit(train_ts)
 
@@ -327,7 +336,7 @@ def clean_df_for_etna(orderstats, tradestats, obstats):
     return df[['timestamp', 'segment', 'target']], median_tradestats, median_orderstats, median_open, median_pr_low
 
 
-def predict(trade, order, obs):
+def predict(trade, order, obs, horizon):
     """Тут мы прописываем логику обработки предикта etna:
     если будет рост отдаем 1
     если падение -1
@@ -346,8 +355,10 @@ def predict(trade, order, obs):
 
     for segment in df['segment'].unique().tolist():
         df_temp = df[df['segment'] == segment]
-        predict_temp = etna_predict(TSDataset.to_dataset(df_temp), segment)
+
+        predict_temp = etna_predict(TSDataset.to_dataset(df_temp), segment, horizon)
         print(f'{segment} predict ready')
+
 
         predict_temp['trade_datetime'] = list_trade_datetime_tradestats
 
@@ -376,11 +387,12 @@ def predict(trade, order, obs):
 class Agent:
     """Класс, который описывает поведение агента в среде биржи со своим портфелем"""
 
-    def __init__(self):
+    def __init__(self, uuid):
         """Инициализация агента и его портфеля"""
         self.limit = LIMIT
         self.profit = 0
-        self.uuid = uuid4()
+        self.uuid = uuid
+
 
     def by(self, ticket, count, price):
         """Реализация выставление тикета в стакан на покупку"""
@@ -500,6 +512,17 @@ class Agent:
             None
         """
         self.limit += sum
+
+
+    def close_day(self):
+        """ в конце дня закрываем все сделки в портфеле.
+        """
+        stocks_in_profile = client.select_all_portfolio_stocks(bot_id=self.uuid)
+        for stock in stocks_in_profile:
+           count, price = client.select_stock_count_and_price_in_portfolio(bot_id=self.uuid, ticket=stock)
+           client.sell_stock(bot_id=self.uuid, ticket=stock, count=count)
+           result = count * price
+           self.add_limit(result)
 
 
 def my_plot_forecast(

@@ -70,7 +70,8 @@ class SQLiteClient:
         return self.execute(select_all_query)
 
     def select_all_portfolio_stocks(self, bot_id):
-        select_all_query= f"""SELECT * from stock_portfolio WHERE bot_id=="{bot_id}" """
+
+        select_all_query= """SELECT * from stock_portfolio WHERE bot_id=="{bot_id}" """
         return self.execute(select_all_query)
 
     def select_stock_count_and_price_in_portfolio(self, bot_id, ticket):
