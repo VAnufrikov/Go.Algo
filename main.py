@@ -2,7 +2,7 @@ import os
 from uuid import uuid4
 
 from settings import HORIZON
-from stock_portfolio.agent import run_agent
+from stock_portfolio.agent_old import run_agent
 
 if __name__ == "__main__":
     """Запускаем бота и устанавливаем нужную библиотеку etna"""

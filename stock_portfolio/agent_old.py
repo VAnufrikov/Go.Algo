@@ -151,9 +151,9 @@ def run_agent(horizon, uuid):
 
             df_price = inside[inside["segment"] == "price"].reset_index(drop=True)
 
-            print(df_price.head())
-
-            print(df_price.info())
+            # print(df_price.head())
+            #
+            # print(df_price.info())
 
             last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
@@ -239,10 +239,11 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
         forecast_ts=forecast_ts, test_ts=test_ts, train_ts=train_ts, n_train_samples=50
     )
 
-    # if segment == 'price':
-    #     print(f'start_backtest {segment}')
-    #     metrics_df, forecast_df, fold_info_df = pipeline.backtest(ts=ts, metrics=[MAE(), MSE(), SMAPE()], n_folds=5,
-    #                                                           mode="expand", n_jobs=-1)
+    # if segment == "vol":
+    #     print(f"start_backtest {segment}")
+    #     metrics_df, forecast_df, fold_info_df = pipeline.backtest(
+    #         ts=ts, metrics=[MAE(), MSE(), SMAPE()], n_folds=5, mode="expand", n_jobs=-1
+    #     )
     #
     #     my_plot_backtest(forecast_df, ts)
     #     print(metrics_df.head(100))
@@ -415,7 +416,7 @@ def predict(trade, order, obs, horizon):
             drop=True
         )
 
-    print(predict.info())
+    # print(predict.info())
 
     return predict
 
@@ -460,7 +461,7 @@ class Agent:
     #     prices_list = [(ticket, self.get_ticket_price(ticket)) for ticket in stocks]
     #     return prices_list
 
-    def get_ticket_price(self, ticket: str, df) -> tuple:
+    def get_ticket_price(self, ticket: str, df) -> tuple[int, Any]:
         """Получить закупочную стоимость конкретной акции
         Args:
             ticket: название акции
@@ -534,8 +535,7 @@ class Agent:
         :param portfel_stop_loss: list
         :param portfel_take_profit: list
         """
-        
-        max_price_for_one_bucket = self.limit / max(len(portfel_last_price), 1)
+        max_price_for_one_bucket = self.limit / len(portfel_last_price)
 
         for i in range(len(portfel_tikets)):
             if portfel_last_price[i] <= max_price_for_one_bucket:
