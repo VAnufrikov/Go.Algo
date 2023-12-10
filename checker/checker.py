@@ -4,7 +4,7 @@ import pandas as pd
 
 from settings import Config
 from sqlite.client import SQLiteClient
-from stock_portfolio.agent_old import Agent
+from stock_portfolio.agent import Agent
 
 agent = Agent()
 sql_client = SQLiteClient(Config.SQL_DATABASE_PATH)

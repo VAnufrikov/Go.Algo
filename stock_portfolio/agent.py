@@ -161,6 +161,9 @@ def run_agent(horizon, uuid):
 
             predict_news = NR.predict(ticket=tiket, date=date_time)
 
+            # Домножили на предсказания модели
+            take_profit = take_profit * predict_news
+
             # last_price - цена покупки
             # date_time - дата и время покупки
             # take_profit - прогноз цены продажи с прибылью
