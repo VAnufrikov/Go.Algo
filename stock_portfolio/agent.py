@@ -129,11 +129,16 @@ def run_agent(horizon, uuid):
     выход решение о покупке или продаже"""
     agent = Agent(uuid)
     NR = NewsRegressor()
+    client = SQLiteClient()
     """
     Тут мы должны получать по каждому тикету 
     предикт на стоимость портфеля и далее анализировать какую часть портфеля
     мы можем купить по всем позициям
     """
+
+    client.connect()
+    client.create_orders_table()
+    client.create_stock_portfolio_table()
 
     if LIMIT != 0:
         # Пока не пройдемся по всем тикетам из листа тикетов
@@ -542,7 +547,7 @@ class Agent:
 
         for i in range(len(portfel_tikets)):
             if portfel_last_price[i] <= max_price_for_one_bucket:
-                ticket_count = max_price_for_one_bucket // portfel_last_price[i]
+                ticket_count = max_price_for_one_bucket // max(portfel_last_price[i], 1)
 
                 self.by(
                     ticket=portfel_tikets[i],
