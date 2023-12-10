@@ -62,9 +62,9 @@ def make_indicators(df: pd.DataFrame):
     Double EMA: https://site.financialmodelingprep.com/developer/docs/technical-intraday-dema
 
     """
-    pr_high = df[["segment"] == "pr_high"].reset_index(drop=True)
-    pr_low = df[["segment"] == "pr_low"].reset_index(drop=True)
-    df = df[["segment"] == "price"].reset_index(drop=True)
+    pr_high = df[df["segment"] == "pr_high"].reset_index(drop=True)
+    pr_low = df[df["segment"] == "pr_low"].reset_index(drop=True)
+    df = df[df["segment"] == "price"].reset_index(drop=True)
 
     ema = df["target"].ewm(span=50, adjust=False).mean()
 
@@ -149,7 +149,11 @@ def run_agent(horizon, uuid):
 
             inside = predict(tradestats, orderstats, obstats, HORIZON)
 
-            df_price = inside[["segment"] == "price"].reset_index(drop=True)
+            df_price = inside[inside["segment"] == "price"].reset_index(drop=True)
+
+            print(df_price.head())
+
+            print(df_price.info())
 
             last_price, date_time = agent.get_ticket_price(tiket, df_price)
 
@@ -242,11 +246,11 @@ def save_plot_forecast(forecast_ts, test_ts, train_ts, pipeline, ts, segment):
     #
     #     my_plot_backtest(forecast_df, ts)
     #     print(metrics_df.head(100))
-    metricSMAPE = SMAPE(y_true=test_ts, y_pred=forecast_ts)
+    # metricSMAPE = SMAPE(y_true=test_ts, y_pred=forecast_ts)
     # metricMAE = mae(y_true=test_ts, y_pred=forecast_ts)
     # metricMSE = MSE(y_true=test_ts, y_pred=forecast_ts)
     # TODO Исправить метрики !!!!!!
-    print(f"{segment} SMAPE = {metricSMAPE}")
+    # print(f"{segment} SMAPE = {metricSMAPE}")
     # print(f'{segment} MAE = {metricMAE}')
     # print(f'{segment} MSE = {metricMSE}')
 
@@ -446,15 +450,15 @@ class Agent:
             f"Нет профита по {tiket} сейчас {date_time} цена = {last_price} меньше цены в будущем = {take_profit} плюс влияние новостей {predict_news}"
         )
 
-    def get_prices(self, stocks: list) -> list[tuple]:
-        """Получить закупочную стоимость акций, которые необходимо купить
-        Args:
-            stocks: список акций, которые необходимо купить.
-        Returns:
-            prices_list: [("ticket", "price")] - список цен акций
-        """
-        prices_list = [(ticket, self.get_ticket_price(ticket)) for ticket in stocks]
-        return prices_list
+    # def get_prices(self, stocks: list) -> list[tuple]:
+    #     """Получить закупочную стоимость акций, которые необходимо купить
+    #     Args:
+    #         stocks: список акций, которые необходимо купить.
+    #     Returns:
+    #         prices_list: [("ticket", "price")] - список цен акций
+    #     """
+    #     prices_list = [(ticket, self.get_ticket_price(ticket)) for ticket in stocks]
+    #     return prices_list
 
     def get_ticket_price(self, ticket: str, df) -> tuple[int, Any]:
         """Получить закупочную стоимость конкретной акции
@@ -466,11 +470,14 @@ class Agent:
         """
         shift = HORIZON + 1
 
-        df = df.iloc[-shift:].head(1)
+        df_new = df.iloc[-shift:].head(1)
+        print(df_new.head())
 
-        price = int(df["target"])
+        print(df_new.info())
 
-        date_time = df["trade_datetime"]
+        price = int(df_new["target"])
+
+        date_time = str(df_new["trade_datetime"])
 
         print(f"target price = {price}")
 
@@ -488,7 +495,7 @@ class Agent:
         # TODO вернуть функцию get_min_max_support для расчета уровней
         # max_support, min_support = get_min_max_support(df_price)
 
-        df = df[["segment"] == "price"].reset_index(drop=True)
+        df = df[df["segment"] == "price"].reset_index(drop=True)
 
         df = df.iloc[-HORIZON:]
 
