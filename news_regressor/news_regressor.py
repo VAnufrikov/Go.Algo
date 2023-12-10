@@ -22,7 +22,7 @@ class NewsRegressor:
         """
         df = self.df
         result = 1.0
-        timestamp = datetime.datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.datetime.strptime(str(date)[:19], "%Y-%m-%dT%H:%M:%S")
         all_news = df[df["date"] < timestamp]
         ticket_news = df[
             (df["ticket"] == ticket)

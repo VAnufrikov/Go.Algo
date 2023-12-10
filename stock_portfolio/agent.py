@@ -460,7 +460,7 @@ class Agent:
     #     prices_list = [(ticket, self.get_ticket_price(ticket)) for ticket in stocks]
     #     return prices_list
 
-    def get_ticket_price(self, ticket: str, df) -> tuple[int, Any]:
+    def get_ticket_price(self, ticket: str, df) -> tuple:
         """Получить закупочную стоимость конкретной акции
         Args:
             ticket: название акции
@@ -471,13 +471,10 @@ class Agent:
         shift = HORIZON + 1
 
         df_new = df.iloc[-shift:].head(1)
-        print(df_new.head())
-
-        print(df_new.info())
 
         price = int(df_new["target"])
 
-        date_time = str(df_new["trade_datetime"])
+        date_time = df_new["trade_datetime"].values[0]
 
         print(f"target price = {price}")
 
@@ -537,7 +534,8 @@ class Agent:
         :param portfel_stop_loss: list
         :param portfel_take_profit: list
         """
-        max_price_for_one_bucket = self.limit / len(portfel_last_price)
+        
+        max_price_for_one_bucket = self.limit / max(len(portfel_last_price), 1)
 
         for i in range(len(portfel_tikets)):
             if portfel_last_price[i] <= max_price_for_one_bucket:
